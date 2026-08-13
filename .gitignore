@@ -8,9 +8,18 @@
 /.next/
 /out/
 
-# env
+# env / secrets
 .env
-.env*.local
+.env.*
+!.env.example
+*.pem
+*.p12
+credentials.json
+service-account*.json
+
+# local agent notes
+AGENTS.md
+agents.md
 
 # debug
 npm-debug.log*
