@@ -25,7 +25,8 @@ export default async function AdminHome() {
   return (
     <>
       <PageHeader kicker="Exec" title="Admin">
-        Invite members, approve firms, and post to the member feed.
+        This panel is only for execs. Invite people, approve firms, and post to the club feed.
+        Use Club in the nav to go back to the member hub.
       </PageHeader>
       <ul className="grid gap-4 md:grid-cols-2">
         {links.map((l) => (

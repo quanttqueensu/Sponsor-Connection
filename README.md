@@ -59,4 +59,4 @@ The default `{{ .ConfirmationURL }}` still works (tokens arrive in the URL hash)
 | Public | `/login`, `/join`, `/auth/callback` |
 | Member | `/feed`, `/packages`, `/applications`, `/profile`, `/members`, `/messages` |
 | Company | `/company`, `/company/posts/new`, `/company/applicants`, `/company/messages` |
-| Admin | `/admin`, `/admin/invite`, plus the member app |
+| Admin | `/admin` panel (invite, people, companies, requests, posts, applications). Admins are also members and use the member app separately. |

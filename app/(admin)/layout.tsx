@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import HubNav from "@/components/HubNav";
+import AdminNav from "@/components/AdminNav";
 import { getCurrentProfile } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <>
-      <HubNav profile={profile} />
+      <AdminNav />
       <div className="mx-auto max-w-6xl px-5 py-10">{children}</div>
     </>
   );

@@ -4,40 +4,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
-import type { Profile } from "@/lib/types";
 
-type Props = {
-  profile: Profile;
-  unread?: number;
-};
+const LINKS = [
+  { href: "/admin/invite", label: "Invite" },
+  { href: "/admin/people", label: "People" },
+  { href: "/admin/companies", label: "Companies" },
+  { href: "/admin/requests", label: "Requests" },
+  { href: "/admin/posts", label: "Posts" },
+  { href: "/admin/applications", label: "Applications" },
+];
 
-export default function HubNav({ profile, unread = 0 }: Props) {
+export default function AdminNav() {
   const pathname = usePathname();
-  const isCompany = profile.role === "company_user";
-
-  const links = isCompany
-    ? [
-        { href: "/company", label: "Posts" },
-        { href: "/company/applicants", label: "Applicants" },
-        { href: "/company/messages", label: "Messages" },
-      ]
-    : [
-        { href: "/feed", label: "Feed" },
-        { href: "/applications", label: "Applications" },
-        { href: "/packages", label: "Packages" },
-        { href: "/members", label: "Members" },
-        { href: "/messages", label: "Messages" },
-        { href: "/profile", label: "Profile" },
-      ];
-
-  if (profile.is_admin) {
-    links.push({ href: "/admin", label: "Admin" });
-  }
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-navy/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-        <Link href={isCompany ? "/company" : "/feed"} className="flex items-center gap-2">
+        <Link href="/admin" className="flex items-center gap-2">
           <Image
             src="/images/logos/quantt-icon.png"
             alt=""
@@ -48,28 +31,30 @@ export default function HubNav({ profile, unread = 0 }: Props) {
           />
           <span className="text-[13px] font-bold tracking-[2px] text-white">
             QUANTT
-            <span className="ml-1.5 font-normal tracking-wide text-white/45">Hub</span>
+            <span className="ml-1.5 font-normal tracking-wide text-blue-light/80">Admin</span>
           </span>
         </Link>
         <div className="flex max-w-[70%] items-center gap-4 overflow-x-auto md:max-w-none">
-          {links.map((link) => {
+          {LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-            const showBadge = link.label === "Messages" && unread > 0;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative text-[11px] uppercase tracking-[1px] ${
+                className={`text-[11px] uppercase tracking-[1px] ${
                   active ? "text-white" : "text-white/55 hover:text-white/80"
                 }`}
               >
                 {link.label}
-                {showBadge && (
-                  <span className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-blue-light" />
-                )}
               </Link>
             );
           })}
+          <Link
+            href="/feed"
+            className="text-[11px] uppercase tracking-[1px] text-white/40 hover:text-white/70"
+          >
+            Club
+          </Link>
           <form action={logout}>
             <button
               type="submit"
