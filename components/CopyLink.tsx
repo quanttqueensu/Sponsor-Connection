@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export default function CopyLink({ value }: { value: string }) {
+export default function CopyLink({
+  value,
+  label = "Copy link",
+}: {
+  value: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -17,7 +23,7 @@ export default function CopyLink({ value }: { value: string }) {
           window.setTimeout(() => setCopied(false), 2000);
         }}
       >
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Copied" : label}
       </button>
     </div>
   );

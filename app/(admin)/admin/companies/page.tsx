@@ -1,7 +1,8 @@
 import PageHeader from "@/components/PageHeader";
 import CopyLink from "@/components/CopyLink";
+import ManualInviteBanner from "@/components/ManualInviteBanner";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
-import { inviteCompany, toggleSponsor } from "@/lib/actions/admin";
+import { inviteCompany, readManualInvite, toggleSponsor } from "@/lib/actions/admin";
 import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
@@ -9,15 +10,17 @@ import type { Company } from "@/lib/types";
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; manual?: string }>;
 }) {
-  const { sent, error } = await searchParams;
+  const { sent, error, manual } = await searchParams;
+  const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
   const { data: companies } = await supabase.from("companies").select("*").order("name");
 
   return (
     <>
       <PageHeader kicker="Firms" title="Companies" />
+      {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
       <div className="mb-10 border border-white/10 p-5">
         <p className="text-[11px] uppercase tracking-[2px] text-white/45">Sponsor signup link</p>
         <p className="mt-2 text-sm text-white/60">

@@ -1,9 +1,16 @@
 import PageHeader from "@/components/PageHeader";
-import { reviewJoinRequest } from "@/lib/actions/admin";
+import ManualInviteBanner from "@/components/ManualInviteBanner";
+import { readManualInvite, reviewJoinRequest } from "@/lib/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { JoinRequest } from "@/lib/types";
 
-export default async function RequestsPage() {
+export default async function RequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ manual?: string }>;
+}) {
+  const { manual } = await searchParams;
+  const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
   const { data: requests } = await supabase
     .from("company_join_requests")
@@ -14,6 +21,7 @@ export default async function RequestsPage() {
   return (
     <>
       <PageHeader kicker="Queue" title="Join requests" />
+      {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
       <ul>
         {(requests as JoinRequest[] | null)?.map((r) => (
           <li key={r.id} className="border-t border-white/10 py-5">

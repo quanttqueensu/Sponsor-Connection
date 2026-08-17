@@ -1,12 +1,106 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+const MANUAL_INVITE_COOKIE = "hub_manual_invite";
+
+type InviteResult = { via: "email" } | { via: "manual"; password: string };
+
+function randomPassword() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return Buffer.from(bytes).toString("base64url");
+}
+
+function isUniqueViolation(message: string, code?: string) {
+  return code === "23505" || /duplicate|unique/i.test(message);
+}
+
+function isEmailRateLimited(message: string) {
+  return /rate limit|over_email_send_rate_limit/i.test(message);
+}
+
+async function stashManualInvite(email: string, password: string) {
+  const store = await cookies();
+  store.set(MANUAL_INVITE_COOKIE, JSON.stringify({ email, password }), {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 10 * 60,
+    path: "/",
+  });
+}
+
+export async function readManualInvite() {
+  const store = await cookies();
+  const raw = store.get(MANUAL_INVITE_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { email?: string; password?: string };
+    if (!parsed.email || !parsed.password) return null;
+    return { email: parsed.email, password: parsed.password };
+  } catch {
+    return null;
+  }
+}
+
+async function markInviteNeedsPassword(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  appMetadata: Record<string, unknown> | undefined,
+) {
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: {
+      ...(appMetadata ?? {}),
+      must_set_password: true,
+    },
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function createUserWithoutEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+): Promise<InviteResult> {
+  const password = randomPassword();
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { must_set_password: true },
+  });
+  if (!error && data.user) return { via: "manual", password };
+
+  if (error && /already/i.test(error.message)) {
+    const { data: list, error: listErr } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 200,
+    });
+    if (listErr) throw new Error(listErr.message);
+    const existing = list.users.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase(),
+    );
+    if (!existing) throw new Error(error.message);
+    const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      app_metadata: {
+        ...(existing.app_metadata ?? {}),
+        must_set_password: true,
+      },
+    });
+    if (updErr) throw new Error(updErr.message);
+    return { via: "manual", password };
+  }
+
+  throw new Error(error?.message ?? "Could not create user");
+}
 
 function slugify(name: string) {
   return name
@@ -19,20 +113,21 @@ function slugify(name: string) {
 async function sendAuthInvite(
   admin: ReturnType<typeof createAdminClient>,
   email: string,
-) {
+): Promise<InviteResult> {
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: authCallbackUrl(),
   });
-  if (error) throw new Error(error.message);
-  const user = data.user;
-  if (!user) return;
-  const { error: metaErr } = await admin.auth.admin.updateUserById(user.id, {
-    app_metadata: {
-      ...(user.app_metadata ?? {}),
-      must_set_password: true,
-    },
-  });
-  if (metaErr) throw new Error(metaErr.message);
+  if (!error && data.user) {
+    await markInviteNeedsPassword(admin, data.user.id, data.user.app_metadata);
+    return { via: "email" };
+  }
+
+  const message = error?.message ?? "Invite failed";
+  if (!isEmailRateLimited(message) && !/already been (registered|invited)/i.test(message)) {
+    throw new Error(message);
+  }
+
+  return createUserWithoutEmail(admin, email);
 }
 
 export async function requestAccess(formData: FormData) {
@@ -64,10 +159,11 @@ export async function submitCompanyRequest(formData: FormData) {
 }
 
 export async function inviteMember(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  let result: InviteResult = { via: "email" };
   try {
     const profile = await requireProfile();
     if (!profile.is_admin) throw new Error("Admins only");
-    const email = String(formData.get("email") ?? "").trim();
     const fullName = String(formData.get("full_name") ?? "").trim();
     const isAdmin = formData.get("is_admin") === "on";
     const admin = createAdminClient();
@@ -78,16 +174,24 @@ export async function inviteMember(formData: FormData) {
       is_admin: isAdmin,
       invited_by: profile.id,
     });
-    if (invErr) throw new Error(invErr.message);
-    await sendAuthInvite(admin, email);
+    if (invErr && !isUniqueViolation(invErr.message, invErr.code)) {
+      throw new Error(invErr.message);
+    }
+    result = await sendAuthInvite(admin, email);
   } catch (e) {
     redirect(`/admin/people?error=${encodeURIComponent((e as Error).message)}`);
   }
   revalidatePath("/admin/people");
+  if (result.via === "manual") {
+    await stashManualInvite(email, result.password);
+    redirect("/admin/people?manual=1");
+  }
   redirect("/admin/people?sent=1");
 }
 
 export async function inviteCompany(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  let result: InviteResult = { via: "email" };
   try {
     const profile = await requireProfile();
     if (!profile.is_admin) throw new Error("Admins only");
@@ -109,7 +213,6 @@ export async function inviteCompany(formData: FormData) {
       companyId = data.id;
     }
     if (!companyId) throw new Error("Choose or create a company");
-    const email = String(formData.get("email") ?? "").trim();
     const { error: invErr } = await admin.from("invites").insert({
       email,
       full_name: String(formData.get("full_name") ?? "").trim(),
@@ -117,12 +220,18 @@ export async function inviteCompany(formData: FormData) {
       company_id: companyId,
       invited_by: profile.id,
     });
-    if (invErr) throw new Error(invErr.message);
-    await sendAuthInvite(admin, email);
+    if (invErr && !isUniqueViolation(invErr.message, invErr.code)) {
+      throw new Error(invErr.message);
+    }
+    result = await sendAuthInvite(admin, email);
   } catch (e) {
     redirect(`/admin/companies?error=${encodeURIComponent((e as Error).message)}`);
   }
   revalidatePath("/admin/companies");
+  if (result.via === "manual") {
+    await stashManualInvite(email, result.password);
+    redirect("/admin/companies?manual=1");
+  }
   redirect("/admin/companies?sent=1");
 }
 
@@ -176,8 +285,13 @@ export async function reviewJoinRequest(formData: FormData) {
     company_id: company.id,
     invited_by: profile.id,
   });
-  if (inviteRowErr) throw new Error(inviteRowErr.message);
-  await sendAuthInvite(admin, req.contact_email);
+  if (inviteRowErr && !isUniqueViolation(inviteRowErr.message, inviteRowErr.code)) {
+    throw new Error(inviteRowErr.message);
+  }
+  const invite = await sendAuthInvite(admin, req.contact_email);
+  if (invite.via === "manual") {
+    await stashManualInvite(req.contact_email, invite.password);
+  }
 
   const { error: updErr } = await admin
     .from("company_join_requests")
@@ -192,6 +306,9 @@ export async function reviewJoinRequest(formData: FormData) {
   if (updErr) throw new Error(updErr.message);
   revalidatePath("/admin/requests");
   revalidatePath("/admin/companies");
+  if (invite.via === "manual") {
+    redirect("/admin/requests?manual=1");
+  }
 }
 
 export async function toggleSponsor(formData: FormData) {

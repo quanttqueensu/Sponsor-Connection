@@ -1,14 +1,16 @@
 import PageHeader from "@/components/PageHeader";
+import ManualInviteBanner from "@/components/ManualInviteBanner";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
-import { inviteMember } from "@/lib/actions/admin";
+import { inviteMember, readManualInvite } from "@/lib/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; manual?: string }>;
 }) {
-  const { sent, error } = await searchParams;
+  const { sent, error, manual } = await searchParams;
+  const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
   const { data: people } = await supabase
     .from("profiles")
@@ -19,6 +21,7 @@ export default async function PeoplePage({
   return (
     <>
       <PageHeader kicker="Roster" title="People" />
+      {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
       <ul className="mb-10">
         {(people ?? []).map((p) => (
           <li key={p.email} className="border-t border-white/10 py-3 text-sm text-white/80">
