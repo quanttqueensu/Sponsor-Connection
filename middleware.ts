@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { userNeedsPassword } from "@/lib/auth-session";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/for-companies"];
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/for-companies", "/join"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

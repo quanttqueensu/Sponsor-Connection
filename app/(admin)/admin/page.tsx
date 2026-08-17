@@ -15,7 +15,7 @@ export default async function AdminHome() {
 
   const links = [
     { href: "/admin/people", label: "People", hint: `${members ?? 0} members` },
-    { href: "/admin/companies", label: "Companies", hint: "Sponsors and firms" },
+    { href: "/admin/companies", label: "Companies", hint: "Sponsors, firms, and the /join signup link" },
     { href: "/admin/requests", label: "Join requests", hint: `${pending ?? 0} pending` },
     { href: "/admin/applications", label: "Applications", hint: `${apps ?? 0} total` },
     { href: "/admin/posts", label: "New post", hint: "Event, connection, job link" },

@@ -35,7 +35,7 @@ export default async function LoginPage({
       </form>
       <p className="mt-8 text-sm text-white/45">
         Hiring for your firm?{" "}
-        <Link href="/for-companies" className="text-blue-light hover:text-white">
+        <Link href="/join" className="text-blue-light hover:text-white">
           Request access
         </Link>
       </p>

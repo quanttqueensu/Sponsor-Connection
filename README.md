@@ -56,7 +56,7 @@ The default `{{ .ConfirmationURL }}` still works (tokens arrive in the URL hash)
 
 | Who | Paths |
 | --- | --- |
-| Public | `/login`, `/for-companies`, `/auth/callback` |
+| Public | `/login`, `/join`, `/auth/callback` |
 | Member | `/feed`, `/packages`, `/applications`, `/profile`, `/members`, `/messages` |
 | Company | `/company`, `/company/posts/new`, `/company/applicants`, `/company/messages` |
 | Admin | `/admin` plus the member app |

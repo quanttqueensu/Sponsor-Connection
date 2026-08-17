@@ -58,9 +58,9 @@ export async function submitCompanyRequest(formData: FormData) {
   try {
     await requestAccess(formData);
   } catch (e) {
-    redirect(`/for-companies?error=${encodeURIComponent((e as Error).message)}`);
+    redirect(`/join?error=${encodeURIComponent((e as Error).message)}`);
   }
-  redirect("/for-companies?sent=1");
+  redirect("/join?sent=1");
 }
 
 export async function inviteMember(formData: FormData) {

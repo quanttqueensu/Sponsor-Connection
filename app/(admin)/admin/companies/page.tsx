@@ -1,6 +1,8 @@
 import PageHeader from "@/components/PageHeader";
+import CopyLink from "@/components/CopyLink";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { inviteCompany, toggleSponsor } from "@/lib/actions/admin";
+import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
 
@@ -16,6 +18,16 @@ export default async function CompaniesPage({
   return (
     <>
       <PageHeader kicker="Firms" title="Companies" />
+      <div className="mb-10 border border-white/10 p-5">
+        <p className="text-[11px] uppercase tracking-[2px] text-white/45">Sponsor signup link</p>
+        <p className="mt-2 text-sm text-white/60">
+          Share this with hiring contacts. Requests land in Admin → Join requests. Approve there
+          to send them an invite and password link.
+        </p>
+        <div className="mt-3">
+          <CopyLink value={`${siteUrl()}/join`} />
+        </div>
+      </div>
       <ul className="mb-10">
         {(companies as Company[] | null)?.map((c) => (
           <li key={c.id} className="flex items-center justify-between border-t border-white/10 py-3">
