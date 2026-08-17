@@ -31,7 +31,7 @@ export default function HubNav({ profile, unread = 0 }: Props) {
       ];
 
   if (profile.is_admin) {
-    links.push({ href: "/admin", label: "Admin" });
+    links.push({ href: "/admin/invite", label: "Invite" }, { href: "/admin", label: "Admin" });
   }
 
   return (
@@ -53,7 +53,11 @@ export default function HubNav({ profile, unread = 0 }: Props) {
         </Link>
         <div className="flex max-w-[70%] items-center gap-4 overflow-x-auto md:max-w-none">
           {links.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const active =
+              link.href === "/admin"
+                ? pathname === "/admin" ||
+                  (pathname.startsWith("/admin/") && !pathname.startsWith("/admin/invite"))
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
             const showBadge = link.label === "Messages" && unread > 0;
             return (
               <Link
