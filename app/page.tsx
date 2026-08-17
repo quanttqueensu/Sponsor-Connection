@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function Home() {
   useEffect(() => {
     if (window.location.hash.includes("access_token")) return;
-    window.location.replace("/login");
+
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      window.location.replace(user ? "/feed" : "/login");
+    });
   }, []);
 
   return (

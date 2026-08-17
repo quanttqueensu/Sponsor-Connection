@@ -702,13 +702,20 @@ grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant insert on public.company_join_requests to anon;
 
--- Helpers used in RLS must not be callable as PostgREST RPCs.
-revoke execute on function public.member_applied_to_company(uuid, uuid) from public, anon, authenticated;
-revoke execute on function public.current_profile() from public, anon, authenticated;
-revoke execute on function public.is_in_app_job(public.posts) from public, anon, authenticated;
-revoke execute on function public.is_admin() from public, anon, authenticated;
-revoke execute on function public.is_member() from public, anon, authenticated;
-revoke execute on function public.my_company_id() from public, anon, authenticated;
+-- Helpers used in RLS must stay executable by logged-in users (policy checks
+-- run as `authenticated`). Keep them off anon/public so they are not anonymous RPCs.
+revoke execute on function public.member_applied_to_company(uuid, uuid) from public, anon;
+revoke execute on function public.current_profile() from public, anon;
+revoke execute on function public.is_in_app_job(public.posts) from public, anon;
+revoke execute on function public.is_admin() from public, anon;
+revoke execute on function public.is_member() from public, anon;
+revoke execute on function public.my_company_id() from public, anon;
+grant execute on function public.member_applied_to_company(uuid, uuid) to authenticated;
+grant execute on function public.current_profile() to authenticated;
+grant execute on function public.is_in_app_job(public.posts) to authenticated;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.is_member() to authenticated;
+grant execute on function public.my_company_id() to authenticated;
 
 create index if not exists company_users_profile_id_idx on public.company_users (profile_id);
 create index if not exists messages_conversation_id_idx on public.messages (conversation_id, created_at);
