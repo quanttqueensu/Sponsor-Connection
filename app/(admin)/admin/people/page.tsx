@@ -3,7 +3,12 @@ import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { inviteMember } from "@/lib/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function PeoplePage() {
+export default async function PeoplePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string; error?: string }>;
+}) {
+  const { sent, error } = await searchParams;
   const supabase = await createClient();
   const { data: people } = await supabase
     .from("profiles")
@@ -27,6 +32,8 @@ export default async function PeoplePage() {
       </ul>
       <form action={inviteMember} className="max-w-md space-y-3">
         <h2 className="font-heading text-lg font-bold text-white">Invite member</h2>
+        {sent && <p className="text-sm text-blue-light">Invite sent. They will set a password from the email link.</p>}
+        {error && <p className="text-sm text-red-300">{error}</p>}
         <Field label="Name">
           <TextInput name="full_name" required />
         </Field>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter, Merriweather } from "next/font/google";
+import AuthHashCatcher from "@/components/AuthHashCatcher";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,7 +31,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${merriweather.variable}`}>
-      <body className="min-h-screen bg-navy font-body antialiased">{children}</body>
+      <body className="min-h-screen bg-navy font-body antialiased">
+        <AuthHashCatcher />
+        {children}
+      </body>
     </html>
   );
 }

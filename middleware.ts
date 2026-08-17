@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { userNeedsPassword } from "@/lib/auth-session";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/for-companies"];
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/for-companies"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -37,6 +38,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  if (user && userNeedsPassword(user) && !pathname.startsWith("/auth/")) {
+    const redirect = request.nextUrl.clone();
+    redirect.pathname = "/auth/set-password";
+    const res = NextResponse.redirect(redirect);
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+    return res;
+  }
+
   if (!user && !isPublic(pathname)) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/login";
@@ -50,7 +59,7 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (pathname === "/login" && profile) {
+    if (pathname === "/login" && profile && !userNeedsPassword(user)) {
       const redirect = request.nextUrl.clone();
       redirect.pathname = profile.role === "company_user" ? "/company" : "/feed";
       const res = NextResponse.redirect(redirect);

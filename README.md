@@ -27,9 +27,21 @@ insert into public.invites (email, full_name, role, is_admin)
 values ('you@quantt.ca', 'Your Name', 'member', true);
 ```
 
-Then send an invite from the Supabase dashboard for that email. Accept the link, set a password, log in at `/login`.
+Then send an invite from the Supabase dashboard for that email. Click the email link — you should land on **Create your password**, then log in at `/login`.
 
-5. `npm install && npm run dev`
+5. In **Authentication → URL Configuration**:
+   - Site URL = your Netlify origin (e.g. `https://your-site.netlify.app`)
+   - Redirect URLs include `https://your-site.netlify.app/auth/callback` and `http://localhost:3000/auth/callback`
+
+6. In **Authentication → Email Templates → Invite user**, replace the button URL with:
+
+```html
+<a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite">Accept the invite</a>
+```
+
+The default `{{ .ConfirmationURL }}` still works (tokens arrive in the URL hash), but the `token_hash` link is more reliable.
+
+7. `npm install && npm run dev`
 
 ## Rules (v1)
 

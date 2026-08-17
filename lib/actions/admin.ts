@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { notify } from "@/lib/notify";
+import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,25 @@ function slugify(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
     .slice(0, 48);
+}
+
+async function sendAuthInvite(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+) {
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: authCallbackUrl(),
+  });
+  if (error) throw new Error(error.message);
+  const user = data.user;
+  if (!user) return;
+  const { error: metaErr } = await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: {
+      ...(user.app_metadata ?? {}),
+      must_set_password: true,
+    },
+  });
+  if (metaErr) throw new Error(metaErr.message);
 }
 
 export async function requestAccess(formData: FormData) {
@@ -44,58 +64,66 @@ export async function submitCompanyRequest(formData: FormData) {
 }
 
 export async function inviteMember(formData: FormData) {
-  const profile = await requireProfile();
-  if (!profile.is_admin) throw new Error("Admins only");
-  const email = String(formData.get("email") ?? "").trim();
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const isAdmin = formData.get("is_admin") === "on";
-  const admin = createAdminClient();
-  const { error: invErr } = await admin.from("invites").insert({
-    email,
-    full_name: fullName,
-    role: "member",
-    is_admin: isAdmin,
-    invited_by: profile.id,
-  });
-  if (invErr) throw new Error(invErr.message);
-  const { error } = await admin.auth.admin.inviteUserByEmail(email);
-  if (error) throw new Error(error.message);
+  try {
+    const profile = await requireProfile();
+    if (!profile.is_admin) throw new Error("Admins only");
+    const email = String(formData.get("email") ?? "").trim();
+    const fullName = String(formData.get("full_name") ?? "").trim();
+    const isAdmin = formData.get("is_admin") === "on";
+    const admin = createAdminClient();
+    const { error: invErr } = await admin.from("invites").insert({
+      email,
+      full_name: fullName,
+      role: "member",
+      is_admin: isAdmin,
+      invited_by: profile.id,
+    });
+    if (invErr) throw new Error(invErr.message);
+    await sendAuthInvite(admin, email);
+  } catch (e) {
+    redirect(`/admin/people?error=${encodeURIComponent((e as Error).message)}`);
+  }
   revalidatePath("/admin/people");
+  redirect("/admin/people?sent=1");
 }
 
 export async function inviteCompany(formData: FormData) {
-  const profile = await requireProfile();
-  if (!profile.is_admin) throw new Error("Admins only");
-  const admin = createAdminClient();
-  let companyId = emptyToNull(formData.get("company_id"));
-  const newName = String(formData.get("new_company_name") ?? "").trim();
-  if (!companyId && newName) {
-    const { data, error } = await admin
-      .from("companies")
-      .insert({
-        name: newName,
-        slug: slugify(newName) + "-" + Math.random().toString(36).slice(2, 6),
-        is_sponsor: formData.get("is_sponsor") === "on",
-        status: "active",
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    companyId = data.id;
+  try {
+    const profile = await requireProfile();
+    if (!profile.is_admin) throw new Error("Admins only");
+    const admin = createAdminClient();
+    let companyId = emptyToNull(formData.get("company_id"));
+    const newName = String(formData.get("new_company_name") ?? "").trim();
+    if (!companyId && newName) {
+      const { data, error } = await admin
+        .from("companies")
+        .insert({
+          name: newName,
+          slug: slugify(newName) + "-" + Math.random().toString(36).slice(2, 6),
+          is_sponsor: formData.get("is_sponsor") === "on",
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      companyId = data.id;
+    }
+    if (!companyId) throw new Error("Choose or create a company");
+    const email = String(formData.get("email") ?? "").trim();
+    const { error: invErr } = await admin.from("invites").insert({
+      email,
+      full_name: String(formData.get("full_name") ?? "").trim(),
+      role: "company_user",
+      company_id: companyId,
+      invited_by: profile.id,
+    });
+    if (invErr) throw new Error(invErr.message);
+    await sendAuthInvite(admin, email);
+  } catch (e) {
+    redirect(`/admin/companies?error=${encodeURIComponent((e as Error).message)}`);
   }
-  if (!companyId) throw new Error("Choose or create a company");
-  const email = String(formData.get("email") ?? "").trim();
-  const { error: invErr } = await admin.from("invites").insert({
-    email,
-    full_name: String(formData.get("full_name") ?? "").trim(),
-    role: "company_user",
-    company_id: companyId,
-    invited_by: profile.id,
-  });
-  if (invErr) throw new Error(invErr.message);
-  const { error } = await admin.auth.admin.inviteUserByEmail(email);
-  if (error) throw new Error(error.message);
   revalidatePath("/admin/companies");
+  redirect("/admin/companies?sent=1");
 }
 
 export async function reviewJoinRequest(formData: FormData) {
@@ -149,8 +177,7 @@ export async function reviewJoinRequest(formData: FormData) {
     invited_by: profile.id,
   });
   if (inviteRowErr) throw new Error(inviteRowErr.message);
-  const { error: invErr } = await admin.auth.admin.inviteUserByEmail(req.contact_email);
-  if (invErr) throw new Error(invErr.message);
+  await sendAuthInvite(admin, req.contact_email);
 
   const { error: updErr } = await admin
     .from("company_join_requests")

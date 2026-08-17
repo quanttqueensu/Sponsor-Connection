@@ -4,7 +4,12 @@ import { inviteCompany, toggleSponsor } from "@/lib/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
 
-export default async function CompaniesPage() {
+export default async function CompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string; error?: string }>;
+}) {
+  const { sent, error } = await searchParams;
   const supabase = await createClient();
   const { data: companies } = await supabase.from("companies").select("*").order("name");
 
@@ -32,6 +37,8 @@ export default async function CompaniesPage() {
       </ul>
       <form action={inviteCompany} className="max-w-md space-y-3">
         <h2 className="font-heading text-lg font-bold text-white">Invite company contact</h2>
+        {sent && <p className="text-sm text-blue-light">Invite sent. They will set a password from the email link.</p>}
+        {error && <p className="text-sm text-red-300">{error}</p>}
         <Field label="Existing company">
           <select name="company_id" className="w-full rounded px-3 py-2 text-sm">
             <option value="">Create new below</option>
