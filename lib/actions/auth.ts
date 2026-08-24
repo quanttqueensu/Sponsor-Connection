@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { userNeedsPassword } from "@/lib/auth-session";
+import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,37 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
   redirect(await homeForUser(supabase));
+}
+
+/**
+ * Self-serve password reset.
+ *
+ * The outcome never depends on whether the address has an account: a failure
+ * from GoTrue (unknown address, send rate limit) leads to exactly the same
+ * redirect as a success, so /login cannot be used to test whether someone is
+ * a member. This is also the supported way back in for a locked-out user --
+ * before it existed, the only recovery was an admin re-invite, which is what
+ * made that path dangerous.
+ */
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) {
+    redirect(
+      `/login?error=${encodeURIComponent("Enter your email address, then choose “Forgot your password?”.")}`,
+    );
+  }
+
+  try {
+    const supabase = await createClient();
+    // The recovery link lands on /auth/callback, which verifies the recovery
+    // token and forwards to /auth/set-password.
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: authCallbackUrl(),
+    });
+  } catch {
+    // Same answer either way -- see above.
+  }
+  redirect("/login?reset=1");
 }
 
 export async function markMustSetPassword() {

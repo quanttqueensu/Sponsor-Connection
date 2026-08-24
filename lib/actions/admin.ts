@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
+import { denialMessage } from "@/lib/denials";
 import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,6 +12,13 @@ import { createClient } from "@/lib/supabase/server";
 import { denyRedirect } from "./deny";
 
 const MANUAL_INVITE_COOKIE = "hub_manual_invite";
+/**
+ * The cookie carries a working credential, so it is scoped to the only routes
+ * that render it (/admin/invite and /admin/requests) rather than the whole
+ * site, and it lives just long enough to survive the redirect that shows it.
+ */
+const MANUAL_INVITE_PATH = "/admin";
+const MANUAL_INVITE_MAX_AGE = 120;
 
 const JOIN_REQUEST_FAILED =
   "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.";
@@ -24,6 +32,20 @@ const INVITE_FAILED =
  * redirect target never reflects driver output back out of the app.
  */
 class SafeError extends Error {}
+
+/**
+ * The address already has an auth account.
+ *
+ * This is a refusal, never a fallback. An invite must never touch an account
+ * that already exists: doing so would let any exec type a colleague's address
+ * and be handed a working password for their account. Callers report it and
+ * undo whatever they staged; nothing about the existing user is modified.
+ */
+class AlreadyRegisteredError extends Error {
+  constructor() {
+    super("Email already registered");
+  }
+}
 
 /**
  * True for Next's redirect()/notFound() control-flow throws, which must be
@@ -50,27 +72,70 @@ function isEmailRateLimited(message: string) {
   return /rate limit|over_email_send_rate_limit/i.test(message);
 }
 
-async function stashManualInvite(email: string, password: string) {
+async function stashManualInvite(email: string, password: string, adminId: string) {
   const store = await cookies();
-  store.set(MANUAL_INVITE_COOKIE, JSON.stringify({ email, password }), {
+  store.set(MANUAL_INVITE_COOKIE, JSON.stringify({ email, password, adminId }), {
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 10 * 60,
-    path: "/",
+    // Plaintext credential: never let it travel over plain http in production.
+    secure: process.env.NODE_ENV === "production",
+    maxAge: MANUAL_INVITE_MAX_AGE,
+    path: MANUAL_INVITE_PATH,
   });
 }
 
+function forgetManualInvite(store: Awaited<ReturnType<typeof cookies>>) {
+  // readManualInvite runs during a Server Component render, where Next refuses
+  // cookie writes. Best-effort here; ManualInviteBanner calls
+  // clearManualInvite() from the client so the delete actually lands.
+  try {
+    store.set(MANUAL_INVITE_COOKIE, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 0,
+      path: MANUAL_INVITE_PATH,
+    });
+  } catch {
+    // Server Component render: the client-side clear is the real one.
+  }
+}
+
+/**
+ * Hand back the one-time password stashed by the invite that just ran.
+ *
+ * This is an exported server action, i.e. a callable endpoint, so it checks
+ * admin rights itself rather than trusting the page that calls it, and it
+ * only answers the admin who created the stash -- a cookie on a shared exec
+ * laptop is not proof that the person at the keyboard is the inviter.
+ */
 export async function readManualInvite() {
+  const profile = await requireProfile().catch(() => null);
+  if (!profile?.is_admin) return null;
+
   const store = await cookies();
   const raw = store.get(MANUAL_INVITE_COOKIE)?.value;
   if (!raw) return null;
+  forgetManualInvite(store);
   try {
-    const parsed = JSON.parse(raw) as { email?: string; password?: string };
+    const parsed = JSON.parse(raw) as {
+      email?: string;
+      password?: string;
+      adminId?: string;
+    };
     if (!parsed.email || !parsed.password) return null;
+    if (parsed.adminId !== profile.id) return null;
     return { email: parsed.email, password: parsed.password };
   } catch {
     return null;
   }
+}
+
+/** Drop the stashed password once the banner has rendered it. */
+export async function clearManualInvite() {
+  const profile = await requireProfile().catch(() => null);
+  if (!profile?.is_admin) return;
+  forgetManualInvite(await cookies());
 }
 
 async function markInviteNeedsPassword(
@@ -87,6 +152,13 @@ async function markInviteNeedsPassword(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Create a brand-new account with a generated password, for when GoTrue will
+ * not send the invite email (rate limit). Only ever creates: if the address
+ * turns out to already exist, this refuses rather than reaching for the
+ * existing row, so no code path here can hand an admin a password to someone
+ * else's account.
+ */
 async function createUserWithoutEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string,
@@ -100,27 +172,7 @@ async function createUserWithoutEmail(
   });
   if (!error && data.user) return { via: "manual", password };
 
-  if (error && /already/i.test(error.message)) {
-    const { data: list, error: listErr } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
-    if (listErr) throw new Error(listErr.message);
-    const existing = list.users.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase(),
-    );
-    if (!existing) throw new Error(error.message);
-    const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
-      password,
-      email_confirm: true,
-      app_metadata: {
-        ...(existing.app_metadata ?? {}),
-        must_set_password: true,
-      },
-    });
-    if (updErr) throw new Error(updErr.message);
-    return { via: "manual", password };
-  }
+  if (error && /already/i.test(error.message)) throw new AlreadyRegisteredError();
 
   throw new Error(error?.message ?? "Could not create user");
 }
@@ -146,11 +198,20 @@ async function sendAuthInvite(
   }
 
   const message = error?.message ?? "Invite failed";
-  if (!isEmailRateLimited(message) && !/already been (registered|invited)/i.test(message)) {
-    throw new Error(message);
+
+  // "Already registered / already invited" means an account exists. Refuse.
+  // The generated-password fallback below is only ever safe for an address
+  // that has no account yet; running it here would reset a colleague's
+  // password and hand it to whoever typed their email into this form.
+  if (/already been (registered|invited)/i.test(message)) {
+    throw new AlreadyRegisteredError();
   }
 
-  return createUserWithoutEmail(admin, email);
+  // A genuine send-rate limit: the account does not exist, GoTrue just will
+  // not mail it. Creating it with a temporary password to read out is fine.
+  if (isEmailRateLimited(message)) return createUserWithoutEmail(admin, email);
+
+  throw new Error(message);
 }
 
 export async function requestAccess(formData: FormData) {
@@ -187,12 +248,16 @@ export async function submitCompanyRequest(formData: FormData) {
   redirect("/join?sent=1");
 }
 
-async function finishInvite(email: string, result: InviteResult): Promise<never> {
+async function finishInvite(
+  email: string,
+  adminId: string,
+  result: InviteResult,
+): Promise<never> {
   revalidatePath("/admin/invite");
   revalidatePath("/admin/people");
   revalidatePath("/admin/companies");
   if (result.via === "manual") {
-    await stashManualInvite(email, result.password);
+    await stashManualInvite(email, result.password, adminId);
     redirect("/admin/invite?manual=1");
   }
   redirect("/admin/invite?sent=1");
@@ -201,14 +266,23 @@ async function finishInvite(email: string, result: InviteResult): Promise<never>
 export async function invitePerson(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   let result: InviteResult = { via: "email" };
+  let profileId = "";
+  // The invites row has to exist before the auth user is created --
+  // handle_new_user() raises 'Invite required' otherwise -- so it is inserted
+  // first and removed again if the invite does not go out. Only a row this
+  // call actually inserted is removed; a pre-existing pending invite (unique
+  // violation, id stays null) is left alone.
+  let insertedInviteId: string | null = null;
+  let admin: ReturnType<typeof createAdminClient> | null = null;
   try {
     const profile = await requireProfile();
     if (!profile.is_admin) throw new SafeError("Admins only");
+    profileId = profile.id;
     const kind = String(formData.get("kind") ?? "member");
     const fullName = String(formData.get("full_name") ?? "").trim();
     if (!email || !fullName) throw new SafeError("Name and email are required");
 
-    const admin = createAdminClient();
+    admin = createAdminClient();
 
     if (kind === "company") {
       let companyId = emptyToNull(formData.get("company_id"));
@@ -230,27 +304,37 @@ export async function invitePerson(formData: FormData) {
       if (!companyId) {
         throw new SafeError("Choose an existing firm or enter a new company name");
       }
-      const { error: invErr } = await admin.from("invites").insert({
-        email,
-        full_name: fullName,
-        role: "company_user",
-        company_id: companyId,
-        invited_by: profile.id,
-      });
+      const { data: row, error: invErr } = await admin
+        .from("invites")
+        .insert({
+          email,
+          full_name: fullName,
+          role: "company_user",
+          company_id: companyId,
+          invited_by: profile.id,
+        })
+        .select("id")
+        .maybeSingle();
       if (invErr && !isUniqueViolation(invErr.message, invErr.code)) {
         throw new Error(invErr.message);
       }
+      insertedInviteId = row?.id ?? null;
     } else if (kind === "member" || kind === "admin") {
-      const { error: invErr } = await admin.from("invites").insert({
-        email,
-        full_name: fullName,
-        role: "member",
-        is_admin: kind === "admin",
-        invited_by: profile.id,
-      });
+      const { data: row, error: invErr } = await admin
+        .from("invites")
+        .insert({
+          email,
+          full_name: fullName,
+          role: "member",
+          is_admin: kind === "admin",
+          invited_by: profile.id,
+        })
+        .select("id")
+        .maybeSingle();
       if (invErr && !isUniqueViolation(invErr.message, invErr.code)) {
         throw new Error(invErr.message);
       }
+      insertedInviteId = row?.id ?? null;
     } else {
       throw new SafeError("Choose member, admin, or company");
     }
@@ -258,13 +342,28 @@ export async function invitePerson(formData: FormData) {
     result = await sendAuthInvite(admin, email);
   } catch (e) {
     if (isControlFlowError(e)) throw e;
+    // Nothing was invited, so do not leave a row sitting in "Waiting to join"
+    // forever. Best-effort: a failed cleanup must not replace the real reason.
+    if (admin && insertedInviteId) {
+      await admin
+        .from("invites")
+        .delete()
+        .eq("id", insertedInviteId)
+        .then(undefined, () => undefined);
+      revalidatePath("/admin/invite");
+    }
     // Same rule as /join: only this file's own copy reaches the URL. A raw
     // Postgres or GoTrue message here would put constraint and schema detail
     // into a query string (and into any log or referrer that carries it).
-    const message = e instanceof SafeError ? e.message : INVITE_FAILED;
+    const message =
+      e instanceof AlreadyRegisteredError
+        ? denialMessage("invite_email_already_registered")
+        : e instanceof SafeError
+          ? e.message
+          : INVITE_FAILED;
     redirect(`/admin/invite?error=${encodeURIComponent(message)}`);
   }
-  return finishInvite(email, result);
+  return finishInvite(email, profileId, result);
 }
 
 export async function reviewJoinRequest(formData: FormData) {
@@ -317,19 +416,40 @@ export async function reviewJoinRequest(formData: FormData) {
     .single();
   if (cErr) throw new Error(cErr.message);
 
-  const { error: inviteRowErr } = await admin.from("invites").insert({
-    email: req.contact_email,
-    full_name: req.contact_name,
-    role: "company_user",
-    company_id: company.id,
-    invited_by: profile.id,
-  });
+  const { data: inviteRow, error: inviteRowErr } = await admin
+    .from("invites")
+    .insert({
+      email: req.contact_email,
+      full_name: req.contact_name,
+      role: "company_user",
+      company_id: company.id,
+      invited_by: profile.id,
+    })
+    .select("id")
+    .maybeSingle();
   if (inviteRowErr && !isUniqueViolation(inviteRowErr.message, inviteRowErr.code)) {
     throw new Error(inviteRowErr.message);
   }
-  const invite = await sendAuthInvite(admin, req.contact_email);
-  if (invite.via === "manual") {
-    await stashManualInvite(req.contact_email, invite.password);
+
+  let invite: InviteResult | null = null;
+  try {
+    invite = await sendAuthInvite(admin, req.contact_email);
+  } catch (e) {
+    if (!(e instanceof AlreadyRegisteredError)) throw e;
+    // The contact already has an account, so there is nothing to invite and
+    // certainly nothing to reset. Drop the invite row this call just added so
+    // it does not sit in "Waiting to join" forever waiting for a signup that
+    // can never happen, and say so below.
+    if (inviteRow?.id) {
+      await admin
+        .from("invites")
+        .delete()
+        .eq("id", inviteRow.id)
+        .then(undefined, () => undefined);
+    }
+  }
+  if (invite?.via === "manual") {
+    await stashManualInvite(req.contact_email, invite.password, profile.id);
   }
 
   const { data: approved, error: updErr } = await admin
@@ -352,6 +472,9 @@ export async function reviewJoinRequest(formData: FormData) {
   // the invite were still created, so say so rather than reporting success.
   if (!approved?.length) {
     denyRedirect("/admin/requests", "join_request_review_race");
+  }
+  if (!invite) {
+    denyRedirect("/admin/requests", "join_request_contact_already_registered");
   }
   if (invite.via === "manual") {
     redirect("/admin/invite?manual=1");
