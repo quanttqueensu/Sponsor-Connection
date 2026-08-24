@@ -23,7 +23,7 @@ export default async function RequestsPage({
     <>
       <PageHeader kicker="Queue" title="Join requests" />
       <Notice message={denied} />
-      {setup &&<ManualInviteBanner email={setup.email} password={setup.password} />}
+      {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
       <ul>
         {(requests as JoinRequest[] | null)?.map((r) => (
           <li key={r.id} className="border-t border-white/10 py-5">

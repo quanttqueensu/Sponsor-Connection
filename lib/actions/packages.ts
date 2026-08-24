@@ -61,7 +61,7 @@ export async function setDefaultPackage(formData: FormData) {
   // Owner-scoped, matching the RLS policy exactly, so zero rows means the
   // package is gone rather than that it belongs to someone else.
   if (!data?.length) {
-    denyRedirect("/packages", "That package no longer exists, so it was not made your default.");
+    denyRedirect("/packages", "package_default_missing");
   }
   revalidatePath("/packages");
 }
@@ -77,7 +77,7 @@ export async function deletePackage(formData: FormData) {
     .select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
-    denyRedirect("/packages", "That package no longer exists.");
+    denyRedirect("/packages", "package_missing");
   }
   revalidatePath("/packages");
 }

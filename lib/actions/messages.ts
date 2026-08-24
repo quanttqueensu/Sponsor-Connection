@@ -88,10 +88,7 @@ export async function sendMessage(formData: FormData) {
       profile.role === "company_user"
         ? `/company/messages/${conversationId}`
         : `/messages/${conversationId}`;
-    denyRedirect(
-      threadPath,
-      "Your message was sent, but this thread could not be marked as read. It may no longer be yours.",
-    );
+    denyRedirect(threadPath, "message_read_marker_failed");
   }
 }
 

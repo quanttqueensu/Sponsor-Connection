@@ -25,10 +25,7 @@ export async function updateProfile(formData: FormData) {
     .select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
-    denyRedirect(
-      "/profile",
-      "Your profile was not saved. Sign out and back in, then try again.",
-    );
+    denyRedirect("/profile", "profile_save_failed");
   }
   revalidatePath("/profile");
 }
@@ -59,7 +56,7 @@ export async function deleteSection(formData: FormData) {
   // Owner-scoped, matching the RLS policy exactly, so zero rows means the
   // section is already gone rather than that it belongs to someone else.
   if (!data?.length) {
-    denyRedirect("/profile", "That section no longer exists.");
+    denyRedirect("/profile", "profile_section_missing");
   }
   revalidatePath("/profile");
 }
@@ -87,10 +84,7 @@ export async function uploadPhoto(formData: FormData) {
     .select("id");
   if (updErr) throw new Error(updErr.message);
   if (!updated?.length) {
-    denyRedirect(
-      "/profile",
-      "The photo uploaded but could not be attached to your profile. Sign out and back in, then try again.",
-    );
+    denyRedirect("/profile", "profile_photo_attach_failed");
   }
   revalidatePath("/profile");
 }
@@ -113,9 +107,7 @@ export async function setResumeBookOptIn(formData: FormData) {
   if (!data?.length) {
     denyRedirect(
       "/profile",
-      optIn
-        ? "Your resume book opt-in was not saved. You are still opted out."
-        : "Your resume book consent was NOT withdrawn. Nothing changed — try again, and tell a QUANTT exec if it keeps failing.",
+      optIn ? "resume_book_opt_in_failed" : "resume_book_opt_out_failed",
     );
   }
   revalidatePath("/profile");

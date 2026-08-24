@@ -251,10 +251,10 @@ export async function reviewJoinRequest(formData: FormData) {
       .select("id");
     if (error) throw new Error(error.message);
     if (!data?.length) {
-      denyRedirect(
-        "/admin/requests",
-        "That request was not rejected. It may already have been reviewed, or your account may no longer have admin rights.",
-      );
+      // This update has no status filter, so an already-reviewed row still
+      // matches and returns a row. Zero rows can only mean the request was
+      // deleted, or RLS refused the write.
+      denyRedirect("/admin/requests", "join_request_reject_failed");
     }
     revalidatePath("/admin/requests");
     return;
@@ -316,10 +316,7 @@ export async function reviewJoinRequest(formData: FormData) {
   // admin reviewed this request between the check above and now. The firm and
   // the invite were still created, so say so rather than reporting success.
   if (!approved?.length) {
-    denyRedirect(
-      "/admin/requests",
-      "Another admin reviewed that request first. The firm and its invite were created anyway — check Companies before approving again.",
-    );
+    denyRedirect("/admin/requests", "join_request_review_race");
   }
   if (invite.via === "manual") {
     redirect("/admin/invite?manual=1");
@@ -337,10 +334,7 @@ export async function toggleSponsor(formData: FormData) {
     .select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
-    denyRedirect(
-      "/admin/companies",
-      "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
-    );
+    denyRedirect("/admin/companies", "sponsor_toggle_failed");
   }
   revalidatePath("/admin/companies");
 }

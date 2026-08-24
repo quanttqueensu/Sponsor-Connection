@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import type { DenialCode } from "@/components/Notice";
 
 /**
- * Refuse an action legibly. Extends the ?error= pattern already used by
- * lib/actions/auth.ts so the user sees a message instead of a crash page.
- * Never throws — redirect() unwinds via Next's control flow.
+ * Refuse an action legibly. The code — never free text — is what travels in
+ * the URL: Notice looks it up in DENIAL_MESSAGES and renders nothing for an
+ * unknown code, so a crafted ?denied= link cannot put attacker copy inside the
+ * hub's own banner. Never throws — redirect() unwinds via Next's control flow.
  */
-export function denyRedirect(path: string, message: string): never {
-  redirect(`${path}?denied=${encodeURIComponent(message)}`);
+export function denyRedirect(path: string, code: DenialCode): never {
+  redirect(`${path}?denied=${encodeURIComponent(code)}`);
 }

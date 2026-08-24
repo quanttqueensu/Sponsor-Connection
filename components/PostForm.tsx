@@ -20,6 +20,17 @@ export default function PostForm({
   const isEvent = kind === "event";
   // job_link_has_url (0001_init.sql:133) rejects a job_link with no URL.
   const urlRequired = kind === "job_link";
+  // createPost writes external_url only for these kinds; showing the field on
+  // an event or announcement would silently discard whatever was typed.
+  const showUrl = kind === "job" || kind === "job_link";
+
+  function changeKind(next: PostKind) {
+    setKind(next);
+    // Belt and braces: the field unmounts for other kinds, so nothing is
+    // submitted, but clearing the state keeps isInAppJob honest and stops a
+    // stale value reappearing if the user switches back.
+    if (next !== "job" && next !== "job_link") setExternalUrl("");
+  }
 
   return (
     <form action={createPost} className="max-w-lg space-y-4">
@@ -29,7 +40,7 @@ export default function PostForm({
           name="kind"
           required
           value={kind}
-          onChange={(e) => setKind(e.target.value as PostKind)}
+          onChange={(e) => changeKind(e.target.value as PostKind)}
           className="w-full rounded px-3 py-2 text-sm"
         >
           {kinds.map((k) => (
@@ -61,8 +72,11 @@ export default function PostForm({
         <TextInput name="location" />
       </Field>
       {isEvent && (
-        <Field label="Starts at">
-          <TextInput name="starts_at" type="datetime-local" required />
+        <Field label="Starts at (optional)">
+          <TextInput name="starts_at" type="datetime-local" />
+          <p className="mt-1 text-xs text-white/60">
+            Leave blank if the date is still to be announced.
+          </p>
         </Field>
       )}
       {isInAppJob && (
@@ -88,20 +102,24 @@ export default function PostForm({
           </Field>
         </>
       )}
-      <Field label={urlRequired ? "External listing URL" : "External listing URL (optional)"}>
-        <TextInput
-          name="external_url"
-          type="url"
-          required={urlRequired}
-          value={externalUrl}
-          onChange={(e) => setExternalUrl(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-white/60">
-          {urlRequired
-            ? "A job link points members at a listing elsewhere, so it needs a full http:// or https:// address."
-            : "Leave blank to accept applications in the hub. Add a URL to send members to your own careers page instead."}
-        </p>
-      </Field>
+      {showUrl && (
+        <Field
+          label={urlRequired ? "External listing URL" : "External listing URL (optional)"}
+        >
+          <TextInput
+            name="external_url"
+            type="url"
+            required={urlRequired}
+            value={externalUrl}
+            onChange={(e) => setExternalUrl(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-white/60">
+            {urlRequired
+              ? "A job link points members at a listing elsewhere, so it needs a full http:// or https:// address."
+              : "Leave blank to accept applications in the hub. Add a URL to send members to your own careers page instead."}
+          </p>
+        </Field>
+      )}
       <PrimaryButton type="submit">Publish</PrimaryButton>
     </form>
   );

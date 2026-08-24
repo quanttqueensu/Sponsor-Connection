@@ -14,15 +14,6 @@ export async function createPost(formData: FormData) {
   const postFormPath =
     profile.role === "company_user" ? "/company/posts/new" : "/admin/posts";
 
-  const parsedUrl = httpUrlOrNull(formData.get("external_url"));
-  if (parsedUrl === INVALID_URL) {
-    denyRedirect(
-      postFormPath,
-      "That external listing URL isn't valid. Use a full http:// or https:// web address, or leave it blank.",
-    );
-  }
-  const externalUrl = parsedUrl;
-
   let companyId: string | null = emptyToNull(formData.get("company_id"));
   if (profile.role === "company_user") {
     const { data } = await supabase
@@ -39,25 +30,27 @@ export async function createPost(formData: FormData) {
     throw new Error("Only companies and admins can post");
   }
 
+  // Validated only after authorization: a plain member forging this call must
+  // be told they cannot post at all, not redirected to a form they cannot open.
+  const parsedUrl = httpUrlOrNull(formData.get("external_url"));
+  if (parsedUrl === INVALID_URL) {
+    denyRedirect(postFormPath, "post_url_invalid");
+  }
+  const externalUrl = parsedUrl;
+
   const roleType = emptyToNull(formData.get("role_type"));
   const termSeason = emptyToNull(formData.get("term_season"));
   const termYear = Number(formData.get("term_year")) || null;
 
   const isInApp = kind === "job" && !externalUrl;
   if (isInApp && (!roleType || !termSeason || !termYear)) {
-    denyRedirect(
-      postFormPath,
-      "In-app jobs need a role type, term season, and term year. Add an external listing URL instead if you want to link out.",
-    );
+    denyRedirect(postFormPath, "post_term_fields_required");
   }
 
   // job_link_has_url (0001_init.sql:133) requires external_url on a job_link.
   // Without this guard a blank URL reaches the database and crashes.
   if (kind === "job_link" && !externalUrl) {
-    denyRedirect(
-      postFormPath,
-      "A job link needs an external listing URL. Add one, or post it as a job to take applications in the hub.",
-    );
+    denyRedirect(postFormPath, "post_job_link_url_required");
   }
 
   const { error } = await supabase.from("posts").insert({
@@ -108,14 +101,16 @@ export async function closePost(formData: FormData) {
 
   if (error) throw new Error(error.message);
   if (!data?.length) {
-    denyRedirect(
-      profile.role === "company_user"
-        ? "/company"
-        : profile.is_admin
-          ? "/admin/posts"
-          : "/feed",
-      "That post could not be closed. It may belong to another firm.",
-    );
+    // posts_admin_write is `for all`, so an admin matching zero rows means the
+    // post is gone — never that it belongs to someone else. Only the company
+    // policy is firm-scoped, and a plain member cannot close anything.
+    if (profile.role === "company_user") {
+      denyRedirect("/company", "post_close_not_yours");
+    }
+    if (profile.is_admin) {
+      denyRedirect("/admin/posts", "post_close_missing");
+    }
+    denyRedirect("/feed", "post_close_forbidden");
   }
 
   revalidatePath("/company");

@@ -89,7 +89,7 @@ export async function applyToJob(formData: FormData) {
     // applications_one_per_job (0001_init.sql:166). A double-submit is the
     // user's own second click, not an exceptional state.
     if (error.code === "23505") {
-      denyRedirect("/applications", "You've already applied to that job.");
+      denyRedirect("/applications", "application_duplicate");
     }
     throw new Error(error.message);
   }
@@ -100,16 +100,18 @@ export async function applyToJob(formData: FormData) {
     body: `${profile.full_name} applied to ${post.title}`,
   });
   revalidatePath("/feed");
+  revalidatePath(`/feed/${postId}`);
   revalidatePath("/applications");
 }
 
 export async function logOffPlatform(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
+  const postId = emptyToNull(formData.get("post_id"));
   const { error } = await supabase.from("applications").insert({
     member_id: profile.id,
     kind: "off_platform",
-    post_id: emptyToNull(formData.get("post_id")),
+    post_id: postId,
     company_id: emptyToNull(formData.get("company_id")),
     company_name: String(formData.get("company_name") ?? "").trim(),
     stage: "submitted",
@@ -117,10 +119,13 @@ export async function logOffPlatform(formData: FormData) {
   });
   if (error) {
     if (error.code === "23505") {
-      denyRedirect("/applications", "You've already logged an application to that posting.");
+      denyRedirect("/applications", "application_log_duplicate");
     }
     throw new Error(error.message);
   }
+  // The post page is where the off-platform form lives, so it is the page that
+  // must re-render to show the logged state and hide the form.
+  if (postId) revalidatePath(`/feed/${postId}`);
   revalidatePath("/applications");
 }
 
@@ -130,8 +135,17 @@ export async function updateApplicationStage(formData: FormData) {
   const id = String(formData.get("id"));
   const stage = String(formData.get("stage"));
 
+  // One target for every refusal in this action, so an admin or recruiter is
+  // never dumped on the member page they cannot use.
+  const deniedPath =
+    profile.role === "company_user"
+      ? "/company/applicants"
+      : profile.is_admin
+        ? "/admin/applications"
+        : "/applications";
+
   if (!STAGES.includes(stage as (typeof STAGES)[number])) {
-    denyRedirect("/applications", "That is not a valid application stage.");
+    denyRedirect(deniedPath, "stage_invalid");
   }
 
   const { data, error } = await supabase
@@ -142,14 +156,7 @@ export async function updateApplicationStage(formData: FormData) {
 
   if (error) throw new Error(error.message);
   if (!data?.length) {
-    denyRedirect(
-      profile.role === "company_user"
-        ? "/company/applicants"
-        : profile.is_admin
-          ? "/admin/applications"
-          : "/applications",
-      "That application could not be updated.",
-    );
+    denyRedirect(deniedPath, "application_update_failed");
   }
 
   revalidatePath("/applications");
