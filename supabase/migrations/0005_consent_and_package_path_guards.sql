@@ -91,6 +91,39 @@ revoke execute on function public.hiring_packages_path_guard() from public, anon
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
+-- 3. Audit pre-existing hiring_packages rows.
+--
+-- hiring_packages_path_guard() above only fires on INSERT/UPDATE, so any row
+-- written before this migration is grandfathered even if its resume_path or
+-- cover_letter_path does not begin with its own member_id. applyToJob copies
+-- such a path with the SERVICE ROLE, which bypasses storage RLS, so a
+-- non-conforming legacy row is still a live path-confusion risk. This does
+-- not touch those rows or block the migration -- it just surfaces the count
+-- so whoever applies this sees the problem immediately.
+do $$
+declare
+  bad_resume_count integer;
+  bad_cover_letter_count integer;
+begin
+  select count(*) into bad_resume_count
+  from public.hiring_packages
+  where resume_path is null
+    or split_part(resume_path, '/', 1) <> member_id::text;
+
+  select count(*) into bad_cover_letter_count
+  from public.hiring_packages
+  where cover_letter_path is not null
+    and split_part(cover_letter_path, '/', 1) <> member_id::text;
+
+  if bad_resume_count > 0 or bad_cover_letter_count > 0 then
+    raise notice
+      'hiring_packages_path_guard: % pre-existing row(s) with a non-conforming resume_path and % with a non-conforming cover_letter_path were grandfathered by this migration. Review and fix these hiring_packages rows manually (they are not blocked by the new trigger, but applyToJob would still copy them with the service role).',
+      bad_resume_count, bad_cover_letter_count;
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- ROLLBACK (copy-paste as a whole)
 --
 --   drop trigger if exists hiring_packages_path_guard on public.hiring_packages;

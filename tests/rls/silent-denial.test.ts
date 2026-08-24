@@ -7,7 +7,7 @@ import {
   seedCompanyUser,
   seedMember,
 } from "../helpers/db";
-import { DENIAL_MESSAGES } from "../../components/Notice";
+import { DENIAL_MESSAGES } from "../../lib/denials";
 
 describe("RLS denial is observable", () => {
   beforeEach(async () => {

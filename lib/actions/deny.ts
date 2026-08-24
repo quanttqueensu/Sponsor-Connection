@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import type { DenialCode } from "@/components/Notice";
+import type { DenialCode } from "@/lib/denials";
 
 /**
  * Refuse an action legibly. The code — never free text — is what travels in
