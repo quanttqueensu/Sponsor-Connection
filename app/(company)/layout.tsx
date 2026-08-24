@@ -18,12 +18,16 @@ export default async function CompanyLayout({ children }: { children: ReactNode 
 
   let unread = 0;
   if (cu) {
+    // Only the single newest message per conversation, ordered explicitly, so
+    // the cost tracks conversations rather than total message volume.
     const { data: convos } = await supabase
       .from("conversations")
       .select("id, company_last_read_at, messages(created_at)")
-      .eq("company_id", cu.company_id);
+      .eq("company_id", cu.company_id)
+      .order("created_at", { referencedTable: "messages", ascending: false })
+      .limit(1, { referencedTable: "messages" });
     unread = (convos ?? []).filter((c) => {
-      const last = (c.messages as { created_at: string }[] | null)?.at(-1)?.created_at;
+      const last = (c.messages as { created_at: string }[] | null)?.[0]?.created_at;
       if (!last) return false;
       return !c.company_last_read_at || last > c.company_last_read_at;
     }).length;

@@ -5,6 +5,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   isInAppJob,
+  isPlatformJob,
   kindLabel,
   roleTypeLabel,
   termLabel,
@@ -15,6 +16,7 @@ import {
 import { Field, PrimaryButton, TextArea } from "@/components/Form";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { formatDate } from "../_time";
 
 export default async function PostDetailPage({
   params,
@@ -57,6 +59,7 @@ export default async function PostDetailPage({
 
   const p = post as Post;
   const inApp = isInAppJob(p);
+  const closed = p.status === "closed";
   const defaultPkg = (packages ?? []).find((x) => x.is_default) ?? packages?.[0];
 
   return (
@@ -76,6 +79,19 @@ export default async function PostDetailPage({
           .filter(Boolean)
           .join(" · ")}
       </p>
+      <p className="mt-1 text-xs text-white/45">
+        Posted <time dateTime={p.created_at}>{formatDate(p.created_at)}</time>
+      </p>
+      {closed && (
+        <p
+          role="status"
+          className="mt-6 rounded border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/75"
+        >
+          <strong className="text-white">This posting is closed.</strong> It is no longer
+          accepting applications.
+        </p>
+      )}
+
       <div className="mt-6 whitespace-pre-wrap text-sm leading-relaxed text-white/75">{p.body}</div>
 
       <div className="mt-8 flex flex-wrap gap-3">
@@ -104,7 +120,11 @@ export default async function PostDetailPage({
           <input type="hidden" name="post_id" value={p.id} />
           <input type="hidden" name="company_id" value={p.company_id ?? ""} />
           <input type="hidden" name="company_name" value={p.companies?.name ?? "External"} />
-          <p className="text-xs text-white/60">Applied on their site? Log it for execs.</p>
+          <p className="text-xs text-white/60">
+            {closed
+              ? "Applied on their site before this closed? You can still log it for execs."
+              : "Applied on their site? Log it for execs."}
+          </p>
           <PrimaryButton type="submit">Log that I applied</PrimaryButton>
         </form>
       )}
@@ -113,6 +133,19 @@ export default async function PostDetailPage({
         <p className="mt-6 text-sm text-blue-light">
           Logged — this is in your applications.
         </p>
+      )}
+
+      {isPlatformJob(p) && profile && !inApp && (
+        <section className="mt-10 max-w-lg border-t border-white/10 pt-8">
+          <h2 className="font-heading text-lg font-bold text-white">Apply</h2>
+          <p className="mt-3 text-sm text-white/60">
+            This posting is closed, so applications are no longer being accepted here.
+            {existingApp ? " Your application is still in your applications list." : ""}
+          </p>
+          <Link href="/feed" className="mt-4 inline-block text-sm text-blue-light">
+            Browse open postings
+          </Link>
+        </section>
       )}
 
       {inApp && profile && (

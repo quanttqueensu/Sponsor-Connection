@@ -36,6 +36,11 @@ export default async function CompanyMessagesPage() {
           </li>
         ))}
       </ul>
+      {!(convos ?? []).length && (
+        <p className="text-sm text-white/60">
+          No threads yet. Members can start a conversation from any of your posts.
+        </p>
+      )}
     </>
   );
 }

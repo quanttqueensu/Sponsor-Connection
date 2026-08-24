@@ -28,6 +28,11 @@ select {
   color: white;
 }
 
+::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Mouse/touch focus stays quiet: the border tint is enough feedback. */
 input:focus,
 textarea:focus,
 select:focus {
@@ -35,6 +40,17 @@ select:focus {
   border-color: #6b8fd4;
 }
 
-::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+/* Keyboard focus must always be obvious. A 2px blue-light ring with a 2px
+   offset reads clearly on the navy background and follows each element's own
+   border radius, so it never clashes with the border tint above. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid #6b8fd4;
+  outline-offset: 2px;
 }
