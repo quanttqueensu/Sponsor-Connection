@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { Field, PrimaryButton, TextArea } from "@/components/Form";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 export default async function PostDetailPage({
   params,
@@ -45,15 +46,14 @@ export default async function PostDetailPage({
           .order("is_default", { ascending: false })
       : { data: [] as HiringPackage[] };
 
-  const { data: existingApp } =
-    profile && isInAppJob(post as Post)
-      ? await supabase
-          .from("applications")
-          .select("id")
-          .eq("member_id", profile.id)
-          .eq("post_id", id)
-          .maybeSingle()
-      : { data: null };
+  const { data: existingApp } = profile
+    ? await supabase
+        .from("applications")
+        .select("id")
+        .eq("member_id", profile.id)
+        .eq("post_id", id)
+        .maybeSingle()
+    : { data: null };
 
   const p = post as Post;
   const inApp = isInAppJob(p);
@@ -99,7 +99,7 @@ export default async function PostDetailPage({
         )}
       </div>
 
-      {p.external_url && profile && (
+      {p.external_url && profile && !existingApp && (
         <form action={logOffPlatform} className="mt-6 max-w-md space-y-3">
           <input type="hidden" name="post_id" value={p.id} />
           <input type="hidden" name="company_id" value={p.company_id ?? ""} />
@@ -109,13 +109,30 @@ export default async function PostDetailPage({
         </form>
       )}
 
+      {p.external_url && profile && existingApp && (
+        <p className="mt-6 text-sm text-blue-light">
+          Logged — this is in your applications.
+        </p>
+      )}
+
       {inApp && profile && (
         <section className="mt-10 max-w-lg border-t border-white/10 pt-8">
           <h2 className="font-heading text-lg font-bold text-white">Apply</h2>
           {existingApp ? (
             <p className="mt-3 text-sm text-blue-light">Already applied.</p>
           ) : !packages?.length ? (
-            <p className="mt-3 text-sm text-white/55">Create a hiring package first.</p>
+            <div className="mt-3">
+              <p className="text-sm text-white/60">
+                A hiring package bundles your resume, LinkedIn, and an optional cover
+                letter so you can apply in one click. You need one before applying.
+              </p>
+              <Link
+                href="/packages"
+                className="mt-4 inline-block rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
+              >
+                Create a hiring package
+              </Link>
+            </div>
           ) : (
             <form action={applyToJob} encType="multipart/form-data" className="mt-4 space-y-4">
               <input type="hidden" name="post_id" value={p.id} />

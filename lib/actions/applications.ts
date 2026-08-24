@@ -105,7 +105,12 @@ export async function logOffPlatform(formData: FormData) {
     stage: "submitted",
     notes: emptyToNull(formData.get("notes")),
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === "23505") {
+      denyRedirect("/applications", "You've already logged an application to that posting.");
+    }
+    throw new Error(error.message);
+  }
   revalidatePath("/applications");
 }
 
