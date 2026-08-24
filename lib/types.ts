@@ -28,6 +28,7 @@ export type Profile = {
   created_at: string;
   resume_book_opt_in: boolean;
   resume_book_opt_in_at: string | null;
+  resume_book_opt_in_by: string | null;
 };
 
 export type ProfileSection = {
