@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { Post } from "@/lib/types";
-import { isInAppJob, kindLabel, roleTypeLabel, termLabel } from "@/lib/types";
+import { isInAppJob, isPlatformJob, kindLabel, roleTypeLabel, termLabel } from "@/lib/types";
+import { formatDate } from "@/lib/time";
 
 export default function PostCard({ post }: { post: Post }) {
   const company = post.companies;
   const job = isInAppJob(post);
+  const closed = isPlatformJob(post) && post.status === "closed";
   return (
     <Link
       href={`/feed/${post.id}`}
@@ -14,6 +16,9 @@ export default function PostCard({ post }: { post: Post }) {
         <span className="font-heading text-xs text-blue-light">{kindLabel(post.kind)}</span>
         {company?.is_sponsor && (
           <span className="text-[10px] uppercase tracking-wider text-blue-light">Sponsor</span>
+        )}
+        {closed && (
+          <span className="text-[10px] uppercase tracking-wider text-white/40">Closed</span>
         )}
       </div>
       <h2 className="mt-1 font-heading text-xl font-bold text-white">{post.title}</h2>
@@ -29,7 +34,10 @@ export default function PostCard({ post }: { post: Post }) {
       </p>
       <p className="mt-2 line-clamp-2 text-sm text-white/65">{post.body}</p>
       <p className="mt-3 text-[11px] uppercase tracking-wider text-white/60">
-        {job ? "Apply in hub" : post.external_url ? "External listing" : "Post"}
+        {job ? "Apply in hub" : closed ? "Closed" : post.external_url ? "External listing" : "Post"}
+      </p>
+      <p className="mt-1 text-[11px] text-white/45">
+        Posted <time dateTime={post.created_at}>{formatDate(post.created_at)}</time>
       </p>
     </Link>
   );

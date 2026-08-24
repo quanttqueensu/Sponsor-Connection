@@ -4,7 +4,6 @@ import PostCard from "@/components/PostCard";
 import { createClient } from "@/lib/supabase/server";
 import { kindLabel, roleTypeLabel, type Post, type PostKind, type RoleType } from "@/lib/types";
 import Link from "next/link";
-import { formatDate } from "./_time";
 
 const PAGE_SIZE = 20;
 
@@ -171,12 +170,7 @@ export default async function FeedPage({
           </p>
         )}
         {list.map((post) => (
-          <div key={post.id}>
-            <PostCard post={post} />
-            <p className="-mt-4 pb-4 text-[11px] text-white/45">
-              Posted <time dateTime={post.created_at}>{formatDate(post.created_at)}</time>
-            </p>
-          </div>
+          <PostCard key={post.id} post={post} />
         ))}
       </div>
 

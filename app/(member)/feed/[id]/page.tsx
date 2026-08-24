@@ -16,7 +16,7 @@ import {
 import { Field, PrimaryButton, TextArea } from "@/components/Form";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate } from "../_time";
+import { formatDate } from "@/lib/time";
 
 export default async function PostDetailPage({
   params,

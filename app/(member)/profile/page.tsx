@@ -50,28 +50,28 @@ export default async function ProfilePage({
       </form>
       <form action={updateProfile} className="grid max-w-xl gap-4">
         <Field label="Name">
-          <TextInput name="full_name" defaultValue={profile.full_name} required />
+          <TextInput name="full_name" defaultValue={profile.full_name} required maxLength={120} />
         </Field>
         <Field label="Program">
-          <TextInput name="program" defaultValue={profile.program ?? ""} />
+          <TextInput name="program" defaultValue={profile.program ?? ""} maxLength={120} />
         </Field>
         <Field label="Grad year">
           <TextInput name="grad_year" type="number" defaultValue={profile.grad_year ?? ""} />
         </Field>
         <Field label="Bio">
-          <TextArea name="bio" rows={4} defaultValue={profile.bio ?? ""} />
+          <TextArea name="bio" rows={4} defaultValue={profile.bio ?? ""} maxLength={2000} />
         </Field>
         <Field label="Interests">
-          <TextInput name="interests" defaultValue={profile.interests ?? ""} />
+          <TextInput name="interests" defaultValue={profile.interests ?? ""} maxLength={2000} />
         </Field>
         <Field label="LinkedIn">
-          <TextInput name="linkedin_url" defaultValue={profile.linkedin_url ?? ""} />
+          <TextInput name="linkedin_url" defaultValue={profile.linkedin_url ?? ""} maxLength={500} />
         </Field>
         <Field label="GitHub">
-          <TextInput name="github_url" defaultValue={profile.github_url ?? ""} />
+          <TextInput name="github_url" defaultValue={profile.github_url ?? ""} maxLength={500} />
         </Field>
         <Field label="Website">
-          <TextInput name="website_url" defaultValue={profile.website_url ?? ""} />
+          <TextInput name="website_url" defaultValue={profile.website_url ?? ""} maxLength={500} />
         </Field>
         <PrimaryButton type="submit">Save profile</PrimaryButton>
       </form>
@@ -97,10 +97,10 @@ export default async function ProfilePage({
       </ul>
       <form action={addSection} className="mt-6 max-w-xl space-y-3">
         <Field label="Section title">
-          <TextInput name="label" required placeholder="Coursework" />
+          <TextInput name="label" required placeholder="Coursework" maxLength={80} />
         </Field>
         <Field label="Content">
-          <TextArea name="body" rows={3} required />
+          <TextArea name="body" rows={3} required maxLength={4000} />
         </Field>
         <PrimaryButton type="submit">Add section</PrimaryButton>
       </form>

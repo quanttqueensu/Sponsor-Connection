@@ -1,6 +1,13 @@
-// Times are rendered on the server, so pin the zone and locale: production
-// servers run in UTC and the club is based in Kingston, Ontario.
+// Rendered on the server, so pin locale and zone: production runs in UTC and
+// the club is based in Kingston, Ontario.
 const ZONE = "America/Toronto";
+
+const dateFmt = new Intl.DateTimeFormat("en-CA", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: ZONE,
+});
 
 const timeFmt = new Intl.DateTimeFormat("en-CA", {
   hour: "numeric",
@@ -22,6 +29,11 @@ const dayKeyFmt = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   timeZone: ZONE,
 });
+
+/** "Aug 24, 2026" — how old a listing is, at a glance. */
+export function formatDate(iso: string) {
+  return dateFmt.format(new Date(iso));
+}
 
 /** "2:05 p.m." — the time of day a message was sent. */
 export function formatTime(iso: string) {

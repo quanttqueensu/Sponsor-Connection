@@ -7,7 +7,7 @@ import { PrimaryButton, TextArea } from "@/components/Form";
 import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { dayKey, formatDay, formatTime } from "../_time";
+import { dayKey, formatDay, formatTime } from "@/lib/time";
 
 const PAGE_SIZE = 50;
 const MAX_MESSAGES = 500;
