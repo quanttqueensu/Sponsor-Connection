@@ -33,7 +33,7 @@ export default async function ApplicationsPage({
           <li key={a.id} className="border-t border-white/10 py-4">
             <p className="text-white">
               {a.kind === "in_app" ? a.posts?.title : a.company_name}{" "}
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-white/60">
                 {a.kind === "in_app" ? a.package_name : "off-platform"} · {a.stage}
               </span>
             </p>

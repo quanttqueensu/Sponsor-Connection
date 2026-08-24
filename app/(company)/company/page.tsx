@@ -50,14 +50,14 @@ export default async function CompanyHome({
           <li key={p.id} className="border-t border-white/10 py-4">
             <Link href={`/company/posts/${p.id}`} className="text-white hover:text-blue-light">
               {p.title}{" "}
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-white/60">
                 {kindLabel(p.kind)} · {p.status}
               </span>
             </Link>
             {p.status === "open" && (
               <form action={closePost} className="mt-1">
                 <input type="hidden" name="id" value={p.id} />
-                <button className="text-xs uppercase tracking-wider text-white/35">Close</button>
+                <button className="text-xs uppercase tracking-wider text-white/60">Close</button>
               </form>
             )}
           </li>

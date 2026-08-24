@@ -36,7 +36,7 @@ export default async function ApplicantsPage({
         {(apps as Application[] | null)?.map((a) => (
           <li key={a.id} className="border-t border-white/10 py-4">
             <p className="text-white">{a.profiles?.full_name}</p>
-            <p className="text-sm text-white/45">
+            <p className="text-sm text-white/60">
               {a.posts?.title} · {a.stage}
             </p>
             {a.post_id && (

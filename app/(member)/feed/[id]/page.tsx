@@ -61,7 +61,7 @@ export default async function PostDetailPage({
 
   return (
     <article>
-      <p className="text-[11px] uppercase tracking-[2px] text-blue-light/70">
+      <p className="text-[11px] uppercase tracking-[2px] text-blue-light">
         {kindLabel(p.kind)}
         {p.companies?.is_sponsor ? " · Sponsor" : ""}
       </p>
@@ -104,7 +104,7 @@ export default async function PostDetailPage({
           <input type="hidden" name="post_id" value={p.id} />
           <input type="hidden" name="company_id" value={p.company_id ?? ""} />
           <input type="hidden" name="company_name" value={p.companies?.name ?? "External"} />
-          <p className="text-xs text-white/45">Applied on their site? Log it for execs.</p>
+          <p className="text-xs text-white/60">Applied on their site? Log it for execs.</p>
           <PrimaryButton type="submit">Log that I applied</PrimaryButton>
         </form>
       )}

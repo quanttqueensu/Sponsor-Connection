@@ -49,7 +49,7 @@ export default async function SetPasswordPage({
       <form action={setPassword} className="mt-10 w-full max-w-sm space-y-4">
         {error && <p className="text-sm text-red-300">{error}</p>}
         {!invited && (
-          <p className="text-sm text-white/45">
+          <p className="text-sm text-white/60">
             Use this form to choose the password you&apos;ll log in with.
           </p>
         )}

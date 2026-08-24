@@ -42,14 +42,14 @@ export default async function MemberProfilePage({
       <dl className="mt-8 space-y-4">
         {fields.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-[11px] uppercase tracking-wider text-white/40">{label}</dt>
+            <dt className="text-[11px] uppercase tracking-wider text-white/60">{label}</dt>
             <dd className="mt-1 whitespace-pre-wrap text-sm text-white/75">{value}</dd>
           </div>
         ))}
       </dl>
       {(sections as ProfileSection[] | null)?.map((s) => (
         <section key={s.id} className="mt-8 border-t border-white/10 pt-6">
-          <h2 className="text-[11px] uppercase tracking-wider text-white/40">{s.label}</h2>
+          <h2 className="text-[11px] uppercase tracking-wider text-white/60">{s.label}</h2>
           <p className="mt-2 whitespace-pre-wrap text-sm text-white/75">{s.body}</p>
         </section>
       ))}

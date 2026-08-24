@@ -42,7 +42,7 @@ export default async function PackagesPage({
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-white/45">{pkg.linkedin_url}</p>
+                <p className="text-sm text-white/60">{pkg.linkedin_url}</p>
               </div>
               <div className="flex gap-2">
                 {!pkg.is_default && (
@@ -55,7 +55,7 @@ export default async function PackagesPage({
                 )}
                 <form action={deletePackage}>
                   <input type="hidden" name="id" value={pkg.id} />
-                  <button className="text-xs uppercase tracking-wider text-white/35 hover:text-white">
+                  <button className="text-xs uppercase tracking-wider text-white/60 hover:text-white">
                     Delete
                   </button>
                 </form>

@@ -44,13 +44,13 @@ export default async function RequestsPage({
               <form action={reviewJoinRequest}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="decision" value="rejected" />
-                <button className="text-xs uppercase tracking-wider text-white/40">Reject</button>
+                <button className="text-xs uppercase tracking-wider text-white/60">Reject</button>
               </form>
             </div>
           </li>
         ))}
       </ul>
-      {!(requests ?? []).length && <p className="text-sm text-white/45">No pending requests.</p>}
+      {!(requests ?? []).length && <p className="text-sm text-white/60">No pending requests.</p>}
     </>
   );
 }

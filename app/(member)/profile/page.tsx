@@ -11,7 +11,8 @@ import {
 } from "@/lib/actions/profile";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ProfileSection } from "@/lib/types";
+import type { HiringPackage, ProfileSection } from "@/lib/types";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function ProfilePage({
@@ -28,6 +29,12 @@ export default async function ProfilePage({
     .select("*")
     .eq("member_id", profile.id)
     .order("sort_order");
+  const { data: defaultPackage } = await supabase
+    .from("hiring_packages")
+    .select("id, name")
+    .eq("member_id", profile.id)
+    .eq("is_default", true)
+    .maybeSingle<Pick<HiringPackage, "id" | "name">>();
 
   return (
     <>
@@ -80,7 +87,7 @@ export default async function ProfilePage({
               </div>
               <form action={deleteSection}>
                 <input type="hidden" name="id" value={s.id} />
-                <button className="text-xs uppercase tracking-wider text-white/35 hover:text-white">
+                <button className="text-xs uppercase tracking-wider text-white/60 hover:text-white">
                   Delete
                 </button>
               </form>
@@ -103,10 +110,28 @@ export default async function ProfilePage({
         <p className="mt-2 text-sm text-white/60">
           QUANTT sponsors will be able to browse an opt-in resume book. If you opt
           in, sponsor firms will be able to see your name, program, graduation
-          year, and your default hiring package&apos;s resume. The resume book
+          year, and the resume on your default hiring package. The resume book
           does not include your applications or messages. You can withdraw at
           any time.
         </p>
+        {defaultPackage ? (
+          <p className="mt-2 text-sm text-white/60">
+            Your default package is <strong className="text-white">{defaultPackage.name}</strong>.
+            That is the resume sponsors would see.{" "}
+            <Link href="/packages" className="text-blue-light hover:text-white">
+              Change it
+            </Link>
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-white/60">
+            You have no default hiring package, so there is no resume to show. Opting in exposes
+            your name, program, and graduation year only, until you{" "}
+            <Link href="/packages" className="text-blue-light hover:text-white">
+              create a package
+            </Link>{" "}
+            and set it as your default.
+          </p>
+        )}
         <p className="mt-2 text-sm text-white/80">
           You are currently{" "}
           <strong>{profile.resume_book_opt_in ? "opted in" : "opted out"}</strong>.

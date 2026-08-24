@@ -101,12 +101,12 @@ export default async function FeedPage({
         </button>
       </form>
       <div>
-        {list.length === 0 && <p className="text-sm text-white/45">No posts yet.</p>}
+        {list.length === 0 && <p className="text-sm text-white/60">No posts yet.</p>}
         {list.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}
       </div>
-      <p className="mt-10 text-sm text-white/35">
+      <p className="mt-10 text-sm text-white/60">
         Applied off-platform?{" "}
         <Link href="/applications" className="text-blue-light">
           Log it
