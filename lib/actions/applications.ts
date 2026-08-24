@@ -8,6 +8,28 @@ import { createClient } from "@/lib/supabase/server";
 import { isInAppJob, type Post } from "@/lib/types";
 import { denyRedirect } from "./deny";
 
+/**
+ * Deletes snapshot objects a failed apply already created.
+ *
+ * Scoped to `snapshots/{appId}/` on purpose: the copies share a bucket with the
+ * member's own `{member_id}/packages/...` source files, which must never be
+ * touched. Storage failures here are logged, not thrown -- the caller is
+ * already on its way to reporting the real error.
+ */
+async function removeSnapshots(
+  admin: ReturnType<typeof createAdminClient>,
+  appId: string,
+  paths: string[],
+) {
+  const prefix = `snapshots/${appId}/`;
+  const own = paths.filter((p) => p.startsWith(prefix));
+  if (!own.length) return;
+  const { error } = await admin.storage.from("resumes").remove(own);
+  if (error) {
+    console.warn(`applyToJob: orphaned snapshots under ${prefix}: ${error.message}`);
+  }
+}
+
 const STAGES = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
 
 export async function applyToJob(formData: FormData) {
@@ -38,6 +60,9 @@ export async function applyToJob(formData: FormData) {
   let coverPath: string | null = null;
   const appId = crypto.randomUUID();
   const admin = createAdminClient();
+  // Every snapshot object this invocation has created, so a failure after the
+  // copies can undo them instead of leaking orphans into the resumes bucket.
+  const snapshots: string[] = [];
 
   if (coverMode === "none") {
     coverLetter = null;
@@ -53,6 +78,7 @@ export async function applyToJob(formData: FormData) {
       contentType: "application/pdf",
     });
     if (error) throw new Error(error.message);
+    snapshots.push(coverPath);
     coverLetter = null;
   }
 
@@ -60,7 +86,11 @@ export async function applyToJob(formData: FormData) {
   const { error: copyErr } = await admin.storage
     .from("resumes")
     .copy(pack.resume_path, snapResume);
-  if (copyErr) throw new Error(copyErr.message);
+  if (copyErr) {
+    await removeSnapshots(admin, appId, snapshots);
+    throw new Error(copyErr.message);
+  }
+  snapshots.push(snapResume);
 
   let snapCover = coverPath;
   if (coverMode === "default" && pack.cover_letter_path) {
@@ -68,7 +98,11 @@ export async function applyToJob(formData: FormData) {
     const { error: coverCopyErr } = await admin.storage
       .from("resumes")
       .copy(pack.cover_letter_path, snapCover);
-    if (coverCopyErr) throw new Error(coverCopyErr.message);
+    if (coverCopyErr) {
+      await removeSnapshots(admin, appId, snapshots);
+      throw new Error(coverCopyErr.message);
+    }
+    snapshots.push(snapCover);
   }
 
   const { error } = await supabase.from("applications").insert({
@@ -86,6 +120,10 @@ export async function applyToJob(formData: FormData) {
     stage: "submitted",
   });
   if (error) {
+    // Nothing references these copies once the row is gone, and no other code
+    // ever collects them, so drop them here. This must run BEFORE denyRedirect,
+    // which unwinds by throwing NEXT_REDIRECT.
+    await removeSnapshots(admin, appId, snapshots);
     // applications_one_per_job (0001_init.sql:166). A double-submit is the
     // user's own second click, not an exceptional state.
     if (error.code === "23505") {
@@ -106,8 +144,25 @@ export async function applyToJob(formData: FormData) {
 
 export async function logOffPlatform(formData: FormData) {
   const profile = await requireProfile();
+  if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
   const postId = emptyToNull(formData.get("post_id"));
+
+  // post_id arrives from the form, and applications_one_per_job is a unique
+  // index on (member_id, post_id): logging against an arbitrary id would burn
+  // the member's only slot for a real job they may still want to apply to in
+  // the hub. Only accept an id that resolves to a post they can actually see.
+  if (postId) {
+    const { data: post, error: postErr } = await supabase
+      .from("posts")
+      .select("id")
+      .eq("id", postId)
+      .maybeSingle();
+    if (postErr || !post) {
+      denyRedirect("/applications", "application_log_post_missing");
+    }
+  }
+
   const { error } = await supabase.from("applications").insert({
     member_id: profile.id,
     kind: "off_platform",

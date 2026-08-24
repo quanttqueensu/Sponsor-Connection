@@ -31,6 +31,8 @@ const MESSAGES = {
   application_duplicate: "You've already applied to that job.",
   application_log_duplicate:
     "You've already logged an application to that posting.",
+  application_log_post_missing:
+    "That posting no longer exists, so the application was not logged. Log it without a posting instead.",
   stage_invalid: "That is not a valid application stage.",
   application_update_failed: "That application could not be updated.",
 
@@ -41,10 +43,6 @@ const MESSAGES = {
     "Another admin reviewed that request first. The firm and its invite were created anyway — check Companies before approving again.",
   sponsor_toggle_failed:
     "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
-
-  // lib/actions/messages.ts
-  message_read_marker_failed:
-    "Your message was sent, but this thread could not be marked as read. It may no longer be yours.",
 
   // lib/actions/packages.ts
   package_default_missing:

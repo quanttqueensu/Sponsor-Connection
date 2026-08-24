@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { notify } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
-import { denyRedirect } from "./deny";
 
 export async function startConversation(formData: FormData) {
   const profile = await requireProfile();
@@ -65,11 +64,15 @@ export async function sendMessage(formData: FormData) {
 
   const col =
     profile.role === "company_user" ? "company_last_read_at" : "member_last_read_at";
-  const { data: touched, error: touchErr } = await supabase
+  // No zero-row branch here on purpose: the messages insert above already
+  // passed, and for both roles conversations_member_update /
+  // conversations_company_update are strictly weaker than the messages insert
+  // policy, so a sender who could post into this thread can always stamp its
+  // read marker. A refusal is unreachable rather than merely unlikely.
+  const { error: touchErr } = await supabase
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
-    .eq("id", conversationId)
-    .select("id");
+    .eq("id", conversationId);
   if (touchErr) throw new Error(touchErr.message);
 
   await notify({
@@ -80,16 +83,6 @@ export async function sendMessage(formData: FormData) {
   });
   revalidatePath("/messages");
   revalidatePath("/company/messages");
-
-  // The message itself is sent; only the read marker was refused. Say so on
-  // the thread rather than reporting a clean send.
-  if (!touched?.length) {
-    const threadPath =
-      profile.role === "company_user"
-        ? `/company/messages/${conversationId}`
-        : `/messages/${conversationId}`;
-    denyRedirect(threadPath, "message_read_marker_failed");
-  }
 }
 
 export async function markRead(conversationId: string) {

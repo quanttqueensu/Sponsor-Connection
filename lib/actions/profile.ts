@@ -32,6 +32,10 @@ export async function updateProfile(formData: FormData) {
 
 export async function addSection(formData: FormData) {
   const profile = await requireProfile();
+  // sections_own_write is `for all` on member_id = auth.uid(), so without this
+  // check a company_user could insert profile_sections rows that every member
+  // then reads through sections_member_read.
+  if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
   const { error } = await supabase.from("profile_sections").insert({
     member_id: profile.id,
