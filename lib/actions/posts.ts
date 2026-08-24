@@ -12,7 +12,7 @@ export async function createPost(formData: FormData) {
   const supabase = await createClient();
   const kind = String(formData.get("kind")) as PostKind;
   const postFormPath =
-    profile.role === "company_user" ? "/company/posts/new" : "/admin/posts";
+    profile.role === "company_user" ? "/company/posts/new" : "/admin/posts/new";
 
   let companyId: string | null = emptyToNull(formData.get("company_id"));
   if (profile.role === "company_user") {

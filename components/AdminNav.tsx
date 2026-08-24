@@ -31,7 +31,7 @@ export default function AdminNav() {
           />
           <span className="text-[13px] font-bold tracking-[2px] text-white">
             QUANTT
-            <span className="ml-1.5 font-normal tracking-wide text-blue-light/80">Admin</span>
+            <span className="ml-1.5 font-normal tracking-wide text-blue-light">Admin</span>
           </span>
         </Link>
         <div className="flex max-w-[70%] items-center gap-4 overflow-x-auto md:max-w-none">

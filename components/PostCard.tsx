@@ -11,9 +11,9 @@ export default function PostCard({ post }: { post: Post }) {
       className="block border-t border-white/10 py-6 transition-colors hover:border-white/20"
     >
       <div className="flex items-baseline gap-3">
-        <span className="font-heading text-xs text-blue-light/70">{kindLabel(post.kind)}</span>
+        <span className="font-heading text-xs text-blue-light">{kindLabel(post.kind)}</span>
         {company?.is_sponsor && (
-          <span className="text-[10px] uppercase tracking-wider text-blue-light/50">Sponsor</span>
+          <span className="text-[10px] uppercase tracking-wider text-blue-light">Sponsor</span>
         )}
       </div>
       <h2 className="mt-1 font-heading text-xl font-bold text-white">{post.title}</h2>
