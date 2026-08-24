@@ -22,6 +22,8 @@ export default async function PackagesPage({
     .eq("member_id", profile.id)
     .order("created_at", { ascending: false });
 
+  const rows = (packages as HiringPackage[] | null) ?? [];
+
   return (
     <>
       <PageHeader kicker="Apply" title="Hiring packages">
@@ -29,8 +31,14 @@ export default async function PackagesPage({
         package and cover letter on each in-app job.
       </PageHeader>
       <Notice message={sp.denied} />
+      {rows.length === 0 && (
+        <p className="border border-white/10 p-6 text-sm text-white/60">
+          You have no hiring packages yet. Build your first one with the form below — you
+          need at least one before you can apply to an in-app job.
+        </p>
+      )}
       <ul className="space-y-4">
-        {(packages as HiringPackage[] | null)?.map((pkg) => (
+        {rows.map((pkg) => (
           <li key={pkg.id} className="border-t border-white/10 py-4">
             <div className="flex items-center justify-between gap-4">
               <div>

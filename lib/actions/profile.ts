@@ -9,17 +9,49 @@ export async function updateProfile(formData: FormData) {
   const profile = await requireProfile();
   if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
+
+  // profiles.full_name is `not null`; program/bio/... are unbounded text. The
+  // form's maxlength/required attributes are client-only, so a forged POST
+  // would otherwise store an empty name or an arbitrarily large blob that
+  // every member then renders in the directory.
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const program = emptyToNull(formData.get("program"));
+  const bio = emptyToNull(formData.get("bio"));
+  const interests = emptyToNull(formData.get("interests"));
+  const linkedinUrl = emptyToNull(formData.get("linkedin_url"));
+  const githubUrl = emptyToNull(formData.get("github_url"));
+  const websiteUrl = emptyToNull(formData.get("website_url"));
+  // Parsed here rather than coerced to null on failure: a typo'd year must be
+  // refused, not silently dropped from the member's profile.
+  const rawGradYear = String(formData.get("grad_year") ?? "").trim();
+  const gradYear = rawGradYear === "" ? null : Number(rawGradYear);
+
+  if (
+    !fullName ||
+    fullName.length > MAX_NAME ||
+    overLimit(program, MAX_SHORT) ||
+    overLimit(bio, MAX_LONG) ||
+    overLimit(interests, MAX_LONG) ||
+    overLimit(linkedinUrl, MAX_URL) ||
+    overLimit(githubUrl, MAX_URL) ||
+    overLimit(websiteUrl, MAX_URL) ||
+    (gradYear !== null &&
+      (!Number.isInteger(gradYear) || gradYear < 1900 || gradYear > 2100))
+  ) {
+    denyRedirect("/profile", "profile_invalid");
+  }
+
   const { data, error } = await supabase
     .from("profiles")
     .update({
-      full_name: String(formData.get("full_name") ?? "").trim(),
-      program: emptyToNull(formData.get("program")),
-      grad_year: numOrNull(formData.get("grad_year")),
-      bio: emptyToNull(formData.get("bio")),
-      interests: emptyToNull(formData.get("interests")),
-      linkedin_url: emptyToNull(formData.get("linkedin_url")),
-      github_url: emptyToNull(formData.get("github_url")),
-      website_url: emptyToNull(formData.get("website_url")),
+      full_name: fullName,
+      program,
+      grad_year: gradYear,
+      bio,
+      interests,
+      linkedin_url: linkedinUrl,
+      github_url: githubUrl,
+      website_url: websiteUrl,
     })
     .eq("id", profile.id)
     .select("id");
@@ -37,11 +69,44 @@ export async function addSection(formData: FormData) {
   // then reads through sections_member_read.
   if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
+
+  const label = String(formData.get("label") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+
+  // `Number("")` is 0 but `Number("abc")` is NaN, which serialises to null and
+  // violates the `not null` on profile_sections.sort_order (0001_init.sql) —
+  // a raw Postgres error where the member should see a validation message.
+  const rawSortOrder = String(formData.get("sort_order") ?? "").trim();
+  const sortOrder = rawSortOrder === "" ? 0 : Number(rawSortOrder);
+
+  if (
+    !label ||
+    label.length > MAX_SECTION_LABEL ||
+    !body ||
+    body.length > MAX_SECTION_BODY ||
+    !Number.isInteger(sortOrder) ||
+    sortOrder < 0 ||
+    sortOrder > MAX_SORT_ORDER
+  ) {
+    denyRedirect("/profile", "profile_section_invalid");
+  }
+
+  // Sections are rendered unpaginated on /members/[id] for every member, so
+  // an unbounded count is both a storage and a read-path problem.
+  const { count, error: countErr } = await supabase
+    .from("profile_sections")
+    .select("id", { count: "exact", head: true })
+    .eq("member_id", profile.id);
+  if (countErr) throw new Error(countErr.message);
+  if ((count ?? 0) >= MAX_SECTIONS_PER_MEMBER) {
+    denyRedirect("/profile", "profile_section_limit");
+  }
+
   const { error } = await supabase.from("profile_sections").insert({
     member_id: profile.id,
-    label: String(formData.get("label") ?? "").trim(),
-    body: String(formData.get("body") ?? "").trim(),
-    sort_order: Number(formData.get("sort_order") ?? 0),
+    label,
+    body,
+    sort_order: sortOrder,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/profile");
@@ -117,14 +182,21 @@ export async function setResumeBookOptIn(formData: FormData) {
   revalidatePath("/profile");
 }
 
+/** Input caps. Nothing in the schema bounds these text columns. */
+const MAX_NAME = 120;
+const MAX_SHORT = 120;
+const MAX_LONG = 2000;
+const MAX_URL = 500;
+const MAX_SECTION_LABEL = 80;
+const MAX_SECTION_BODY = 4000;
+const MAX_SECTIONS_PER_MEMBER = 20;
+const MAX_SORT_ORDER = 9999;
+
+function overLimit(v: string | null, max: number) {
+  return v !== null && v.length > max;
+}
+
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;
-}
-
-function numOrNull(v: FormDataEntryValue | null) {
-  const s = String(v ?? "").trim();
-  if (!s) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
 }

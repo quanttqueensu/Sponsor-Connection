@@ -1,7 +1,7 @@
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileSection } from "@/lib/types";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export default async function MemberProfilePage({
   params,
@@ -9,7 +9,10 @@ export default async function MemberProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  await getCurrentProfile();
+  // Every sibling member page redirects a signed-out visitor to /login; without
+  // this the anonymous client's RLS-empty read renders a 404 instead.
+  const me = await getCurrentProfile();
+  if (!me) redirect("/login");
   const supabase = await createClient();
   const { data: member } = await supabase
     .from("profiles")

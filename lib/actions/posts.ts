@@ -79,13 +79,24 @@ export async function addComment(formData: FormData) {
   const profile = await requireProfile();
   if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
+  const postId = String(formData.get("post_id") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+
+  // post_comments.body is `not null` with no length check, and the form's
+  // `required` attribute is client-only: a forged POST would otherwise insert
+  // a blank comment, or an arbitrarily large one that every member renders.
+  if (!body || body.length > MAX_COMMENT_BODY) {
+    // Encoded: post_id is raw form input, and it lands in a redirect path.
+    denyRedirect(`/feed/${encodeURIComponent(postId)}`, "comment_invalid");
+  }
+
   const { error } = await supabase.from("post_comments").insert({
-    post_id: String(formData.get("post_id")),
+    post_id: postId,
     author_id: profile.id,
-    body: String(formData.get("body") ?? "").trim(),
+    body,
   });
   if (error) throw new Error(error.message);
-  revalidatePath(`/feed/${String(formData.get("post_id"))}`);
+  revalidatePath(`/feed/${postId}`);
 }
 
 export async function closePost(formData: FormData) {
@@ -116,6 +127,8 @@ export async function closePost(formData: FormData) {
   revalidatePath("/company");
   revalidatePath("/feed");
 }
+
+const MAX_COMMENT_BODY = 4000;
 
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();

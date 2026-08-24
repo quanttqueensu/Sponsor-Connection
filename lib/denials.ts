@@ -26,6 +26,8 @@ const MESSAGES = {
     "That post could not be closed. It no longer exists.",
   post_close_forbidden:
     "You do not have permission to close posts.",
+  comment_invalid:
+    "That comment was not posted. Write something first, and keep it under 4,000 characters.",
 
   // lib/actions/applications.ts
   application_duplicate: "You've already applied to that job.",
@@ -41,6 +43,10 @@ const MESSAGES = {
     "That request was not rejected. It may have been deleted, or your account may no longer have admin rights.",
   join_request_review_race:
     "Another admin reviewed that request first. The firm and its invite were created anyway — check Companies before approving again.",
+  join_request_contact_already_registered:
+    "The firm was created and the request approved, but that contact address already has a Hub account, so no invite was sent and their account was not touched. They are not attached to the new firm yet — invite a different contact for the firm, or have them tell an exec which account to link.",
+  invite_email_already_registered:
+    "That address already has a Hub account, so no invite was sent and nothing about the account was changed. Ask them to log in — if they cannot get in, they can use “Forgot your password?” on the login page. Re-inviting never changes an existing account's role.",
   sponsor_toggle_failed:
     "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
 
@@ -48,6 +54,8 @@ const MESSAGES = {
   package_default_missing:
     "That package no longer exists, so it was not made your default.",
   package_missing: "That package no longer exists.",
+  package_create_duplicate:
+    "That package was not created — you already have a default package. Uncheck \u201cmake this my default\u201d and try again.",
 
   // lib/actions/profile.ts
   profile_save_failed:
@@ -57,6 +65,12 @@ const MESSAGES = {
     "The photo uploaded but could not be attached to your profile. Sign out and back in, then try again.",
   resume_book_opt_in_failed:
     "Your resume book opt-in was not saved. You are still opted out.",
+  profile_invalid:
+    "Your profile was not saved. Check that your name is filled in, that your graduation year is a real year, and that no field is unreasonably long.",
+  profile_section_invalid:
+    "That section was not added. Give it a short label and a body, keep the body under 4,000 characters, and use a whole number for the order.",
+  profile_section_limit:
+    "That section was not added — you already have the maximum number of profile sections. Delete one first.",
   resume_book_opt_out_failed:
     "Your resume book consent was NOT withdrawn. Nothing changed — try again, and tell a QUANTT exec if it keeps failing.",
 } as const;
@@ -65,6 +79,16 @@ const MESSAGES = {
 export type DenialCode = keyof typeof MESSAGES;
 
 const DENIAL_MESSAGES_BY_CODE: Record<DenialCode, string> = MESSAGES;
+
+/**
+ * The copy for a code, for the handful of screens that render a refusal
+ * through their own `?error=` banner instead of Notice's `?denied=` lookup.
+ * The argument is a DenialCode, never URL text, so the result is still copy
+ * this repo wrote -- the property Notice exists to guarantee.
+ */
+export function denialMessage(code: DenialCode): string {
+  return DENIAL_MESSAGES_BY_CODE[code];
+}
 
 /**
  * Looks up a denial code that may not be a real DenialCode at all -- the

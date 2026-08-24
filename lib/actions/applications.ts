@@ -30,6 +30,21 @@ async function removeSnapshots(
   }
 }
 
+/**
+ * Rejects anything that is not really a PDF.
+ *
+ * `File.type` is a client-supplied header and the upload below pins
+ * `contentType` to that same claim, so without a look at the bytes a member
+ * could store an arbitrary payload as `application/pdf` and have a recruiter
+ * download it as a cover letter.
+ */
+async function assertPdf(file: File, label: string) {
+  if (file.type !== "application/pdf") throw new Error(`${label} must be a PDF`);
+  if (file.size > 5 * 1024 * 1024) throw new Error(`${label} must be under 5MB`);
+  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  if (String.fromCharCode(...head) !== "%PDF-") throw new Error(`${label} must be a PDF`);
+}
+
 const STAGES = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
 
 export async function applyToJob(formData: FormData) {
@@ -71,8 +86,7 @@ export async function applyToJob(formData: FormData) {
   } else if (coverMode === "upload") {
     const file = formData.get("cover_pdf") as File | null;
     if (!file || file.size === 0) throw new Error("Upload a cover letter PDF");
-    if (file.type !== "application/pdf") throw new Error("Cover letter must be a PDF");
-    if (file.size > 5 * 1024 * 1024) throw new Error("Cover letter must be under 5MB");
+    await assertPdf(file, "Cover letter");
     coverPath = `snapshots/${appId}/cover.pdf`;
     const { error } = await admin.storage.from("resumes").upload(coverPath, file, {
       contentType: "application/pdf",

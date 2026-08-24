@@ -1,3 +1,21 @@
+/**
+ * Hand-maintained mirrors of the database schema. There are NO generated
+ * Supabase types in this repo, and ~30 call sites cast query results straight
+ * to these shapes with `as`, which means TypeScript never checks them against
+ * the real columns — every drift here is a silent wrong-data bug.
+ *
+ * These types mirror, table by table:
+ *   supabase/migrations/0001_init.sql   — every table below
+ *   supabase/migrations/0004_resume_book_opt_in.sql — profiles.resume_book_*
+ *   supabase/migrations/0005_consent_and_package_path_guards.sql — constraints
+ *     only (no new columns)
+ *
+ * If you add, rename, retype, or change the nullability of a column in a
+ * migration, update the matching type in this file in the same commit.
+ * Nullability here follows the column's `not null`, not what a given `select`
+ * happens to project — narrow with `Pick<...>` at the call site instead.
+ */
+
 export type UserRole = "member" | "company_user";
 export type PostKind = "job" | "event" | "announcement" | "connection" | "job_link";
 export type RoleType = "full_time" | "internship" | "coop";
@@ -10,6 +28,8 @@ export type ApplicationStage =
   | "offer"
   | "closed";
 export type PostStatus = "open" | "closed";
+export type CompanyStatus = "active" | "inactive";
+export type JoinRequestStatus = "pending" | "approved" | "rejected";
 
 export type Profile = {
   id: string;
@@ -60,7 +80,25 @@ export type Company = {
   logo_url: string | null;
   website: string | null;
   description: string | null;
-  status: "active" | "inactive";
+  status: CompanyStatus;
+  created_at: string;
+};
+
+export type CompanyUser = {
+  company_id: string;
+  profile_id: string;
+};
+
+export type Invite = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  is_admin: boolean;
+  company_id: string | null;
+  invited_by: string | null;
+  accepted_at: string | null;
+  created_at: string;
 };
 
 export type Post = {
@@ -79,6 +117,7 @@ export type Post = {
   term_year: number | null;
   external_url: string | null;
   created_at: string;
+  updated_at: string;
   companies?: Company | null;
 };
 
@@ -107,6 +146,7 @@ export type Application = {
   stage: ApplicationStage;
   notes: string | null;
   created_at: string;
+  updated_at: string;
   posts?: Post | null;
   profiles?: Profile | null;
 };
@@ -137,7 +177,11 @@ export type JoinRequest = {
   contact_name: string;
   contact_email: string;
   note: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: JoinRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  admin_note: string | null;
+  company_id: string | null;
   created_at: string;
 };
 
@@ -181,4 +225,23 @@ export function termLabel(season: TermSeason | null, year: number | null) {
   if (!season || !year) return null;
   const s = season[0].toUpperCase() + season.slice(1);
   return `${s} ${year}`;
+}
+
+export function stageLabel(stage: ApplicationStage) {
+  switch (stage) {
+    case "submitted":
+      return "Submitted";
+    case "reviewing":
+      return "Under review";
+    case "interviewing":
+      return "Interviewing";
+    case "offer":
+      return "Offer";
+    case "closed":
+      return "Closed";
+  }
+}
+
+export function applicationKindLabel(kind: ApplicationKind) {
+  return kind === "in_app" ? "Through the hub" : "Off-platform";
 }

@@ -4,7 +4,8 @@ import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { logOffPlatform, updateApplicationStage } from "@/lib/actions/applications";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Application } from "@/lib/types";
+import { applicationKindLabel, stageLabel, type Application } from "@/lib/types";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 const stages = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
@@ -24,17 +25,32 @@ export default async function ApplicationsPage({
     .eq("member_id", profile.id)
     .order("created_at", { ascending: false });
 
+  const rows = (apps as Application[] | null) ?? [];
+
   return (
     <>
       <PageHeader kicker="Pipeline" title="My applications" />
       <Notice message={sp.denied} />
+      {rows.length === 0 && (
+        <p className="border border-white/10 p-6 text-sm text-white/60">
+          Nothing here yet. Apply to an in-app job from the{" "}
+          <Link href="/feed" className="text-blue-light hover:underline">
+            feed
+          </Link>{" "}
+          and it will appear here, or log an application you made elsewhere using the form
+          below.
+        </p>
+      )}
       <ul className="space-y-4">
-        {(apps as Application[] | null)?.map((a) => (
+        {rows.map((a) => (
           <li key={a.id} className="border-t border-white/10 py-4">
             <p className="text-white">
               {a.kind === "in_app" ? a.posts?.title : a.company_name}{" "}
               <span className="text-xs text-white/60">
-                {a.kind === "in_app" ? a.package_name : "off-platform"} · {a.stage}
+                {a.kind === "in_app" && a.package_name
+                  ? a.package_name
+                  : applicationKindLabel(a.kind)}{" "}
+                · {stageLabel(a.stage)}
               </span>
             </p>
             {a.kind === "off_platform" && (
@@ -43,7 +59,7 @@ export default async function ApplicationsPage({
                 <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
                   {stages.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {stageLabel(s)}
                     </option>
                   ))}
                 </select>

@@ -2,7 +2,6 @@ import { startConversation } from "@/lib/actions/messages";
 import { updateApplicationStage } from "@/lib/actions/applications";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformJob, kindLabel, type Application, type Post } from "@/lib/types";
 import { notFound, redirect } from "next/navigation";
 
@@ -52,8 +51,8 @@ export default async function CompanyPostPage({
                 {a.cover_letter && (
                   <p className="mt-2 whitespace-pre-wrap text-sm text-white/60">{a.cover_letter}</p>
                 )}
-                <ResumeLink path={a.resume_path} memberId={a.member_id} />
-                <ResumeLink path={a.cover_letter_path} memberId={a.member_id} label="Download cover letter" />
+                <ResumeLink applicationId={a.id} path={a.resume_path} doc="resume" />
+                <ResumeLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
                 <div className="mt-2 flex gap-3">
                   <form action={updateApplicationStage}>
                     <input type="hidden" name="id" value={a.id} />
@@ -87,29 +86,61 @@ export default async function CompanyPostPage({
   );
 }
 
-async function ResumeLink({
+/**
+ * Links to one applicant document, without signing anything up front.
+ *
+ * Two things used to go wrong here. The component accepted any path under
+ * `snapshots/`, so an application row inserted straight through PostgREST
+ * could name ANOTHER student's snapshot and this page would mint a
+ * service-role signed URL for it. It also accepted `{member_id}/...`, the
+ * member's own live package file, which they can re-upload at any time -- so
+ * the "frozen at apply time" guarantee held only for applications created by
+ * applyToJob's happy path.
+ *
+ * Both arms are gone: the only acceptable path is the snapshot copied for
+ * THIS application. Anything else renders an explicit unavailable state, so a
+ * malformed row looks broken to the recruiter instead of looking like a
+ * student who attached nothing.
+ *
+ * The href points at a route handler that re-checks company ownership and
+ * signs a short-lived URL per click, so no unauthenticated resume URL ever
+ * sits in this page's payload.
+ */
+function ResumeLink({
+  applicationId,
   path,
-  memberId,
-  label = "Download resume",
+  doc,
 }: {
+  applicationId: string;
   path: string | null;
-  memberId: string;
-  label?: string;
+  doc: "resume" | "cover";
 }) {
-  if (!path) return null;
-  if (!path.startsWith(`${memberId}/`) && !path.startsWith("snapshots/")) return null;
-  let signedUrl: string | null = null;
-  try {
-    const admin = createAdminClient();
-    const { data } = await admin.storage.from("resumes").createSignedUrl(path, 3600);
-    signedUrl = data?.signedUrl ?? null;
-  } catch {
-    return null;
+  const label = doc === "cover" ? "cover letter" : "resume";
+  // A missing cover letter is ordinary -- most applicants write one inline or
+  // skip it. A missing resume is not: applications_guard requires one.
+  if (!path) {
+    if (doc === "cover") return null;
+    return <UnavailableDoc label={label} />;
   }
-  if (!signedUrl) return null;
+  if (!path.startsWith(`snapshots/${applicationId}/`)) {
+    return <UnavailableDoc label={label} />;
+  }
   return (
-    <a href={signedUrl} className="mt-1 mr-3 inline-block text-xs text-blue-light" target="_blank">
-      {label}
+    <a
+      href={`/company/applications/${applicationId}/resume?doc=${doc}`}
+      className="mt-1 mr-3 inline-block text-xs text-blue-light"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Download {label}
     </a>
+  );
+}
+
+function UnavailableDoc({ label }: { label: string }) {
+  return (
+    <span className="mt-1 mr-3 inline-block text-xs text-white/40">
+      This applicant&rsquo;s {label} is unavailable.
+    </span>
   );
 }
