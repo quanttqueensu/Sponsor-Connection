@@ -2,7 +2,32 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { userNeedsPassword } from "@/lib/auth-session";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/for-companies", "/join"];
+/**
+ * Routes reachable without a session.
+ *
+ * These are listed one by one on purpose. The bare prefix `/auth` used to be
+ * here, which made every future `/auth/*` route public by accident rather than
+ * by decision. **A new auth route is private until someone adds it here
+ * deliberately** — and if you add one, say why in a comment.
+ *
+ *  - `/`, `/for-companies` — public brochure pages.
+ *  - `/login`              — the sign-in form itself.
+ *  - `/join`               — public sponsor access-request form.
+ *  - `/auth/callback`      — lands the invite/recovery link. The tokens arrive
+ *                            in the URL hash and are exchanged client-side, so
+ *                            there is no session yet when this route loads.
+ *  - `/auth/set-password`  — an invited user may land here before the client
+ *                            has finished establishing the session; the page
+ *                            renders <AwaitInviteSession /> in that window.
+ */
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/for-companies",
+  "/join",
+  "/auth/callback",
+  "/auth/set-password",
+];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -124,6 +149,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * Run on everything except real static-asset locations.
+     *
+     * The exclusions are anchored to the start of the path. The previous
+     * pattern excluded *any* path ending in an image extension, so application
+     * routes such as `/members/<id>.png` or `/admin/<id>.png` skipped the
+     * middleware entirely. Asset paths are a property of where a file lives,
+     * not of how its URL happens to end.
+     */
+    "/((?!_next/|favicon\\.ico|favicon\\.png|images/|robots\\.txt|sitemap\\.xml).*)",
   ],
 };
