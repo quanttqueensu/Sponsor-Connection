@@ -65,7 +65,10 @@ export async function applyToJob(formData: FormData) {
   let snapCover = coverPath;
   if (coverMode === "default" && pack.cover_letter_path) {
     snapCover = `snapshots/${appId}/cover.pdf`;
-    await admin.storage.from("resumes").copy(pack.cover_letter_path, snapCover);
+    const { error: coverCopyErr } = await admin.storage
+      .from("resumes")
+      .copy(pack.cover_letter_path, snapCover);
+    if (coverCopyErr) throw new Error(coverCopyErr.message);
   }
 
   const { error } = await supabase.from("applications").insert({
@@ -82,7 +85,14 @@ export async function applyToJob(formData: FormData) {
     cover_letter_path: snapCover,
     stage: "submitted",
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // applications_one_per_job (0001_init.sql:166). A double-submit is the
+    // user's own second click, not an exceptional state.
+    if (error.code === "23505") {
+      denyRedirect("/applications", "You've already applied to that job.");
+    }
+    throw new Error(error.message);
+  }
   await notify({
     type: "application",
     to: [],

@@ -8,6 +8,7 @@ import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 const MANUAL_INVITE_COOKIE = "hub_manual_invite";
 
@@ -238,7 +239,7 @@ export async function reviewJoinRequest(formData: FormData) {
   const decision = String(formData.get("decision"));
   const supabase = await createClient();
   if (decision === "rejected") {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("company_join_requests")
       .update({
         status: "rejected",
@@ -246,8 +247,15 @@ export async function reviewJoinRequest(formData: FormData) {
         reviewed_at: new Date().toISOString(),
         admin_note: emptyToNull(formData.get("admin_note")),
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (!data?.length) {
+      denyRedirect(
+        "/admin/requests",
+        "That request was not rejected. It may already have been reviewed, or your account may no longer have admin rights.",
+      );
+    }
     revalidatePath("/admin/requests");
     return;
   }
@@ -289,7 +297,7 @@ export async function reviewJoinRequest(formData: FormData) {
     await stashManualInvite(req.contact_email, invite.password);
   }
 
-  const { error: updErr } = await admin
+  const { data: approved, error: updErr } = await admin
     .from("company_join_requests")
     .update({
       status: "approved",
@@ -298,11 +306,21 @@ export async function reviewJoinRequest(formData: FormData) {
       company_id: company.id,
     })
     .eq("id", id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
   if (updErr) throw new Error(updErr.message);
   revalidatePath("/admin/requests");
   revalidatePath("/admin/companies");
   revalidatePath("/admin/invite");
+  // The .eq("status", "pending") filter means zero rows here is a race: another
+  // admin reviewed this request between the check above and now. The firm and
+  // the invite were still created, so say so rather than reporting success.
+  if (!approved?.length) {
+    denyRedirect(
+      "/admin/requests",
+      "Another admin reviewed that request first. The firm and its invite were created anyway — check Companies before approving again.",
+    );
+  }
   if (invite.via === "manual") {
     redirect("/admin/invite?manual=1");
   }
@@ -312,11 +330,18 @@ export async function toggleSponsor(formData: FormData) {
   const profile = await requireProfile();
   if (!profile.is_admin) throw new Error("Admins only");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("companies")
     .update({ is_sponsor: formData.get("is_sponsor") === "true" })
-    .eq("id", String(formData.get("id")));
+    .eq("id", String(formData.get("id")))
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect(
+      "/admin/companies",
+      "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
+    );
+  }
   revalidatePath("/admin/companies");
 }
 

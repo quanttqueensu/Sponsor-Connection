@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { notify } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 export async function startConversation(formData: FormData) {
   const profile = await requireProfile();
@@ -64,10 +65,12 @@ export async function sendMessage(formData: FormData) {
 
   const col =
     profile.role === "company_user" ? "company_last_read_at" : "member_last_read_at";
-  await supabase
+  const { data: touched, error: touchErr } = await supabase
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
-    .eq("id", conversationId);
+    .eq("id", conversationId)
+    .select("id");
+  if (touchErr) throw new Error(touchErr.message);
 
   await notify({
     type: "message",
@@ -77,6 +80,19 @@ export async function sendMessage(formData: FormData) {
   });
   revalidatePath("/messages");
   revalidatePath("/company/messages");
+
+  // The message itself is sent; only the read marker was refused. Say so on
+  // the thread rather than reporting a clean send.
+  if (!touched?.length) {
+    const threadPath =
+      profile.role === "company_user"
+        ? `/company/messages/${conversationId}`
+        : `/messages/${conversationId}`;
+    denyRedirect(
+      threadPath,
+      "Your message was sent, but this thread could not be marked as read. It may no longer be yours.",
+    );
+  }
 }
 
 export async function markRead(conversationId: string) {
@@ -87,10 +103,20 @@ export async function markRead(conversationId: string) {
   const q = supabase
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
-    .eq("id", conversationId);
-  const { error } =
+    .eq("id", conversationId)
+    .select("id");
+  const { data, error } =
     profile.role === "company_user"
       ? await q
       : await q.eq("member_id", profile.id);
   if (error) throw new Error("Could not update conversation");
+  // Deliberately NOT a denyRedirect: markRead is invoked from after() while a
+  // page renders, where redirect() has no request to unwind. A refused read
+  // marker is cosmetic — the thread render itself is already RLS-scoped — so
+  // it is logged for the server operator instead of shown to the user.
+  if (!data?.length) {
+    console.warn(
+      `markRead: conversation ${conversationId} refused for profile ${profile.id}`,
+    );
+  }
 }

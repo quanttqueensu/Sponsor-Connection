@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
@@ -13,7 +14,12 @@ import { createClient } from "@/lib/supabase/server";
 import type { ProfileSection } from "@/lib/types";
 import { redirect } from "next/navigation";
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -28,6 +34,7 @@ export default async function ProfilePage() {
       <PageHeader kicker="You" title="Profile">
         Visible to other members. Resumes live on hiring packages, not here.
       </PageHeader>
+      <Notice message={sp.denied} />
       <form action={uploadPhoto} encType="multipart/form-data" className="mb-8 flex items-end gap-3">
         <Field label="Photo">
           <input type="file" name="photo" accept="image/*" />

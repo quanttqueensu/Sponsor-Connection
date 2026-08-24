@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
 import { createPackage, deletePackage, setDefaultPackage } from "@/lib/actions/packages";
@@ -6,7 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import type { HiringPackage } from "@/lib/types";
 import { redirect } from "next/navigation";
 
-export default async function PackagesPage() {
+export default async function PackagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -22,6 +28,7 @@ export default async function PackagesPage() {
         A package is resume + LinkedIn, with an optional default cover letter. You can change
         package and cover letter on each in-app job.
       </PageHeader>
+      <Notice message={sp.denied} />
       <ul className="space-y-4">
         {(packages as HiringPackage[] | null)?.map((pkg) => (
           <li key={pkg.id} className="border-t border-white/10 py-4">

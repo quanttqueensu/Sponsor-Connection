@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 export async function createPackage(formData: FormData) {
   const profile = await requireProfile();
@@ -50,24 +51,34 @@ export async function createPackage(formData: FormData) {
 export async function setDefaultPackage(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("hiring_packages")
     .update({ is_default: true })
     .eq("id", String(formData.get("id")))
-    .eq("member_id", profile.id);
+    .eq("member_id", profile.id)
+    .select("id");
   if (error) throw new Error(error.message);
+  // Owner-scoped, matching the RLS policy exactly, so zero rows means the
+  // package is gone rather than that it belongs to someone else.
+  if (!data?.length) {
+    denyRedirect("/packages", "That package no longer exists, so it was not made your default.");
+  }
   revalidatePath("/packages");
 }
 
 export async function deletePackage(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("hiring_packages")
     .delete()
     .eq("id", String(formData.get("id")))
-    .eq("member_id", profile.id);
+    .eq("member_id", profile.id)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect("/packages", "That package no longer exists.");
+  }
   revalidatePath("/packages");
 }
 

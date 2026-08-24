@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 export async function updateProfile(formData: FormData) {
   const profile = await requireProfile();
   if (profile.role !== "member") throw new Error("Members only");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .update({
       full_name: String(formData.get("full_name") ?? "").trim(),
@@ -20,8 +21,15 @@ export async function updateProfile(formData: FormData) {
       github_url: emptyToNull(formData.get("github_url")),
       website_url: emptyToNull(formData.get("website_url")),
     })
-    .eq("id", profile.id);
+    .eq("id", profile.id)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect(
+      "/profile",
+      "Your profile was not saved. Sign out and back in, then try again.",
+    );
+  }
   revalidatePath("/profile");
 }
 
@@ -41,12 +49,18 @@ export async function addSection(formData: FormData) {
 export async function deleteSection(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profile_sections")
     .delete()
     .eq("id", String(formData.get("id")))
-    .eq("member_id", profile.id);
+    .eq("member_id", profile.id)
+    .select("id");
   if (error) throw new Error(error.message);
+  // Owner-scoped, matching the RLS policy exactly, so zero rows means the
+  // section is already gone rather than that it belongs to someone else.
+  if (!data?.length) {
+    denyRedirect("/profile", "That section no longer exists.");
+  }
   revalidatePath("/profile");
 }
 
@@ -65,7 +79,19 @@ export async function uploadPhoto(formData: FormData) {
     contentType: file.type,
   });
   if (error) throw new Error(error.message);
-  await supabase.from("profiles").update({ photo_path: path }).eq("id", profile.id);
+
+  const { data: updated, error: updErr } = await supabase
+    .from("profiles")
+    .update({ photo_path: path })
+    .eq("id", profile.id)
+    .select("id");
+  if (updErr) throw new Error(updErr.message);
+  if (!updated?.length) {
+    denyRedirect(
+      "/profile",
+      "The photo uploaded but could not be attached to your profile. Sign out and back in, then try again.",
+    );
+  }
   revalidatePath("/profile");
 }
 
@@ -75,12 +101,23 @@ export async function setResumeBookOptIn(formData: FormData) {
   const supabase = await createClient();
   const optIn = formData.get("opt_in") === "true";
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .update({ resume_book_opt_in: optIn })
-    .eq("id", profile.id);
+    .eq("id", profile.id)
+    .select("id");
 
   if (error) throw new Error(error.message);
+  // A silently dropped write here would tell a member their consent was
+  // withdrawn while sponsors could still see them. Never report success.
+  if (!data?.length) {
+    denyRedirect(
+      "/profile",
+      optIn
+        ? "Your resume book opt-in was not saved. You are still opted out."
+        : "Your resume book consent was NOT withdrawn. Nothing changed — try again, and tell a QUANTT exec if it keeps failing.",
+    );
+  }
   revalidatePath("/profile");
 }
 
