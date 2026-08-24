@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { PostKind } from "@/lib/types";
+import { denyRedirect } from "./deny";
 
 export async function createPost(formData: FormData) {
   const profile = await requireProfile();
@@ -65,13 +66,24 @@ export async function addComment(formData: FormData) {
 }
 
 export async function closePost(formData: FormData) {
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const id = String(formData.get("id"));
+
+  const { data, error } = await supabase
     .from("posts")
     .update({ status: "closed" })
-    .eq("id", String(formData.get("id")));
+    .eq("id", id)
+    .select("id");
+
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect(
+      profile.role === "company_user" ? "/company" : "/admin",
+      "That post could not be closed. It may belong to another firm.",
+    );
+  }
+
   revalidatePath("/company");
   revalidatePath("/feed");
 }

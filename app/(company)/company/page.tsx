@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { closePost } from "@/lib/actions/posts";
 import { getCurrentProfile } from "@/lib/auth";
@@ -7,7 +8,12 @@ import { kindLabel, one } from "@/lib/types";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export default async function CompanyHome() {
+export default async function CompanyHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -32,6 +38,7 @@ export default async function CompanyHome() {
       <PageHeader kicker="Company" title={company?.name ?? "Your posts"}>
         You only see posts from your firm. Members see these on the global feed.
       </PageHeader>
+      <Notice message={sp.denied} />
       <Link
         href="/company/posts/new"
         className="inline-block rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"

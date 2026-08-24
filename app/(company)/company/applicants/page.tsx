@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -5,7 +6,12 @@ import type { Application } from "@/lib/types";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export default async function ApplicantsPage() {
+export default async function ApplicantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -25,6 +31,7 @@ export default async function ApplicantsPage() {
   return (
     <>
       <PageHeader kicker="Hiring" title="Applicants" />
+      <Notice message={sp.denied} />
       <ul>
         {(apps as Application[] | null)?.map((a) => (
           <li key={a.id} className="border-t border-white/10 py-4">

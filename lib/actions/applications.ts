@@ -6,6 +6,9 @@ import { notify } from "@/lib/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isInAppJob, type Post } from "@/lib/types";
+import { denyRedirect } from "./deny";
+
+const STAGES = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
 
 export async function applyToJob(formData: FormData) {
   const profile = await requireProfile();
@@ -107,16 +110,32 @@ export async function logOffPlatform(formData: FormData) {
 }
 
 export async function updateApplicationStage(formData: FormData) {
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const id = String(formData.get("id"));
+  const stage = String(formData.get("stage"));
+
+  if (!STAGES.includes(stage as (typeof STAGES)[number])) {
+    denyRedirect("/applications", "That is not a valid application stage.");
+  }
+
+  const { data, error } = await supabase
     .from("applications")
-    .update({ stage: String(formData.get("stage")) })
-    .eq("id", String(formData.get("id")));
+    .update({ stage })
+    .eq("id", id)
+    .select("id");
+
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect(
+      profile.role === "company_user" ? "/company/applicants" : "/applications",
+      "That application could not be updated.",
+    );
+  }
+
   revalidatePath("/applications");
   revalidatePath("/company");
-  revalidatePath("/admin");
+  revalidatePath("/admin/applications");
 }
 
 function emptyToNull(v: FormDataEntryValue | null) {
