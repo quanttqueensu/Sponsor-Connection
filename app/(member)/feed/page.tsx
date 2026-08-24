@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import PostCard from "@/components/PostCard";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,7 @@ export default async function FeedPage({
     company?: string;
     location?: string;
     sponsor?: string;
+    denied?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -55,6 +57,7 @@ export default async function FeedPage({
       <PageHeader kicker="Hub" title="Feed">
         Jobs, events, connections, and listings from QUANTT and partner firms.
       </PageHeader>
+      <Notice message={sp.denied} />
       <form className="mb-8 grid gap-3 md:grid-cols-5">
         <select name="kind" defaultValue={sp.kind ?? ""} className="rounded px-3 py-2 text-sm">
           <option value="">All types</option>

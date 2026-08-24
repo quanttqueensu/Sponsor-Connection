@@ -18,6 +18,8 @@ export default function PostForm({
   const [externalUrl, setExternalUrl] = useState("");
   const isInAppJob = kind === "job" && externalUrl.trim() === "";
   const isEvent = kind === "event";
+  // job_link_has_url (0001_init.sql:133) rejects a job_link with no URL.
+  const urlRequired = kind === "job_link";
 
   return (
     <form action={createPost} className="max-w-lg space-y-4">
@@ -86,16 +88,18 @@ export default function PostForm({
           </Field>
         </>
       )}
-      <Field label="External listing URL">
+      <Field label={urlRequired ? "External listing URL" : "External listing URL (optional)"}>
         <TextInput
           name="external_url"
           type="url"
+          required={urlRequired}
           value={externalUrl}
           onChange={(e) => setExternalUrl(e.target.value)}
         />
         <p className="mt-1 text-xs text-white/60">
-          Leave blank to accept applications in the hub. Add a URL to send members to your own
-          careers page instead.
+          {urlRequired
+            ? "A job link points members at a listing elsewhere, so it needs a full http:// or https:// address."
+            : "Leave blank to accept applications in the hub. Add a URL to send members to your own careers page instead."}
         </p>
       </Field>
       <PrimaryButton type="submit">Publish</PrimaryButton>

@@ -11,7 +11,17 @@ export async function createPost(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
   const kind = String(formData.get("kind")) as PostKind;
-  const externalUrl = httpUrlOrNull(formData.get("external_url"));
+  const postFormPath =
+    profile.role === "company_user" ? "/company/posts/new" : "/admin/posts";
+
+  const parsedUrl = httpUrlOrNull(formData.get("external_url"));
+  if (parsedUrl === INVALID_URL) {
+    denyRedirect(
+      postFormPath,
+      "That external listing URL isn't valid. Use a full http:// or https:// web address, or leave it blank.",
+    );
+  }
+  const externalUrl = parsedUrl;
 
   let companyId: string | null = emptyToNull(formData.get("company_id"));
   if (profile.role === "company_user") {
@@ -36,8 +46,17 @@ export async function createPost(formData: FormData) {
   const isInApp = kind === "job" && !externalUrl;
   if (isInApp && (!roleType || !termSeason || !termYear)) {
     denyRedirect(
-      profile.role === "company_user" ? "/company/posts/new" : "/admin/posts",
+      postFormPath,
       "In-app jobs need a role type, term season, and term year. Add an external listing URL instead if you want to link out.",
+    );
+  }
+
+  // job_link_has_url (0001_init.sql:133) requires external_url on a job_link.
+  // Without this guard a blank URL reaches the database and crashes.
+  if (kind === "job_link" && !externalUrl) {
+    denyRedirect(
+      postFormPath,
+      "A job link needs an external listing URL. Add one, or post it as a job to take applications in the hub.",
     );
   }
 
@@ -108,17 +127,25 @@ function emptyToNull(v: FormDataEntryValue | null) {
   return s.length ? s : null;
 }
 
-function httpUrlOrNull(v: FormDataEntryValue | null) {
+/**
+ * Sentinel for a URL the user typed that we will not accept. The browser's
+ * type="url" check is looser than the protocol check below (it lets ftp://
+ * through), so a bad value is a correctable user mistake, not an exceptional
+ * state — the caller surfaces it with denyRedirect rather than crashing.
+ */
+const INVALID_URL = Symbol("invalid-url");
+
+function httpUrlOrNull(
+  v: FormDataEntryValue | null,
+): string | null | typeof INVALID_URL {
   const s = emptyToNull(v);
   if (!s) return null;
+  let u: URL;
   try {
-    const u = new URL(s);
-    if (u.protocol !== "https:" && u.protocol !== "http:") {
-      throw new Error("Listing URL must be http or https");
-    }
-    return u.toString();
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("Listing")) throw e;
-    throw new Error("Invalid listing URL");
+    u = new URL(s);
+  } catch {
+    return INVALID_URL;
   }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return INVALID_URL;
+  return u.toString();
 }
