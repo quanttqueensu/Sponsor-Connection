@@ -8,10 +8,15 @@ import type { PostKind } from "@/lib/types";
 export default function PostForm({
   kinds,
   companies,
-  redirectTo,
 }: {
   kinds: PostKind[];
   companies?: { id: string; name: string }[];
+  /**
+   * Unused: createPost hard-codes its own destination and never reads a
+   * "redirect" field, so the hidden input that carried this was dead. The
+   * prop stays accepted for now so existing call sites keep compiling; it can
+   * be dropped once they stop passing it.
+   */
   redirectTo?: string;
 }) {
   const [kind, setKind] = useState<PostKind>(kinds[0] ?? "announcement");
@@ -34,7 +39,6 @@ export default function PostForm({
 
   return (
     <form action={createPost} className="max-w-lg space-y-4">
-      {redirectTo && <input type="hidden" name="redirect" value={redirectTo} />}
       <Field label="Type">
         <select
           name="kind"

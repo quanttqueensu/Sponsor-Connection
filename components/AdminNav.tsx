@@ -51,14 +51,14 @@ export default function AdminNav() {
           })}
           <Link
             href="/feed"
-            className="text-[11px] uppercase tracking-[1px] text-white/40 hover:text-white/70"
+            className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
           >
             Club
           </Link>
           <form action={logout}>
             <button
               type="submit"
-              className="text-[11px] uppercase tracking-[1px] text-white/40 hover:text-white/70"
+              className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
             >
               Log out
             </button>

@@ -28,7 +28,7 @@ export default function PostCard({ post }: { post: Post }) {
           .join(" · ")}
       </p>
       <p className="mt-2 line-clamp-2 text-sm text-white/65">{post.body}</p>
-      <p className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
+      <p className="mt-3 text-[11px] uppercase tracking-wider text-white/60">
         {job ? "Apply in hub" : post.external_url ? "External listing" : "Post"}
       </p>
     </Link>

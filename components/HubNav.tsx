@@ -48,7 +48,7 @@ export default function HubNav({ profile, unread = 0 }: Props) {
           />
           <span className="text-[13px] font-bold tracking-[2px] text-white">
             QUANTT
-            <span className="ml-1.5 font-normal tracking-wide text-white/45">Hub</span>
+            <span className="ml-1.5 font-normal tracking-wide text-white/60">Hub</span>
           </span>
         </Link>
         <div className="flex max-w-[70%] items-center gap-4 overflow-x-auto md:max-w-none">
@@ -73,7 +73,7 @@ export default function HubNav({ profile, unread = 0 }: Props) {
           <form action={logout}>
             <button
               type="submit"
-              className="text-[11px] uppercase tracking-[1px] text-white/40 hover:text-white/70"
+              className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
             >
               Log out
             </button>
