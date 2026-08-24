@@ -69,6 +69,21 @@ export async function uploadPhoto(formData: FormData) {
   revalidatePath("/profile");
 }
 
+export async function setResumeBookOptIn(formData: FormData) {
+  const profile = await requireProfile();
+  if (profile.role !== "member") throw new Error("Members only");
+  const supabase = await createClient();
+  const optIn = formData.get("opt_in") === "true";
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ resume_book_opt_in: optIn })
+    .eq("id", profile.id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/profile");
+}
+
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;

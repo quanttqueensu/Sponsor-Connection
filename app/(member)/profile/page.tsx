@@ -3,6 +3,7 @@ import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
 import {
   addSection,
   deleteSection,
+  setResumeBookOptIn,
   updateProfile,
   uploadPhoto,
 } from "@/lib/actions/profile";
@@ -88,6 +89,30 @@ export default async function ProfilePage() {
         </Field>
         <PrimaryButton type="submit">Add section</PrimaryButton>
       </form>
+
+      <section className="mt-10 border-t border-white/10 pt-8">
+        <h2 className="font-heading text-lg font-bold text-white">Resume book</h2>
+        <p className="mt-2 text-sm text-white/60">
+          QUANTT sponsors can browse an opt-in resume book. If you opt in, sponsor
+          firms can see your name, program, graduation year, and your default hiring
+          package&apos;s resume. They cannot see your applications or messages. You
+          can withdraw at any time.
+        </p>
+        <p className="mt-2 text-sm text-white/80">
+          You are currently{" "}
+          <strong>{profile.resume_book_opt_in ? "opted in" : "opted out"}</strong>.
+        </p>
+        <form action={setResumeBookOptIn} className="mt-4">
+          <input
+            type="hidden"
+            name="opt_in"
+            value={profile.resume_book_opt_in ? "false" : "true"}
+          />
+          <PrimaryButton type="submit">
+            {profile.resume_book_opt_in ? "Withdraw from the resume book" : "Opt in"}
+          </PrimaryButton>
+        </form>
+      </section>
     </>
   );
 }

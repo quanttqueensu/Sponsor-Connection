@@ -26,6 +26,8 @@ export type Profile = {
   website_url: string | null;
   photo_path: string | null;
   created_at: string;
+  resume_book_opt_in: boolean;
+  resume_book_opt_in_at: string | null;
 };
 
 export type ProfileSection = {
