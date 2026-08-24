@@ -8,8 +8,31 @@ import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 const MANUAL_INVITE_COOKIE = "hub_manual_invite";
+
+const JOIN_REQUEST_FAILED =
+  "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.";
+
+const INVITE_FAILED =
+  "That invite could not be sent. Check the details and try again, or contact another exec if it keeps failing.";
+
+/**
+ * An error whose message is safe to show the user: it is copy this file wrote,
+ * not text from Postgres or GoTrue. Anything else is reported generically so a
+ * redirect target never reflects driver output back out of the app.
+ */
+class SafeError extends Error {}
+
+/**
+ * True for Next's redirect()/notFound() control-flow throws, which must be
+ * rethrown rather than reported as an invite failure.
+ */
+function isControlFlowError(e: unknown) {
+  const digest = (e as { digest?: unknown })?.digest;
+  return typeof digest === "string" && /^NEXT_(REDIRECT|NOT_FOUND)/.test(digest);
+}
 
 type InviteResult = { via: "email" } | { via: "manual"; password: string };
 
@@ -153,7 +176,13 @@ export async function submitCompanyRequest(formData: FormData) {
   try {
     await requestAccess(formData);
   } catch (e) {
-    redirect(`/join?error=${encodeURIComponent((e as Error).message)}`);
+    if (isControlFlowError(e)) throw e;
+    // /join is public and unauthenticated. The pending-email unique index means
+    // a duplicate submission comes back as a 23505 naming the constraint, so
+    // echoing the driver text would confirm whether an address has already
+    // requested access (email enumeration) and disclose schema besides. One
+    // fixed message for every failure, distinguishing nothing.
+    redirect(`/join?error=${encodeURIComponent(JOIN_REQUEST_FAILED)}`);
   }
   redirect("/join?sent=1");
 }
@@ -174,10 +203,10 @@ export async function invitePerson(formData: FormData) {
   let result: InviteResult = { via: "email" };
   try {
     const profile = await requireProfile();
-    if (!profile.is_admin) throw new Error("Admins only");
+    if (!profile.is_admin) throw new SafeError("Admins only");
     const kind = String(formData.get("kind") ?? "member");
     const fullName = String(formData.get("full_name") ?? "").trim();
-    if (!email || !fullName) throw new Error("Name and email are required");
+    if (!email || !fullName) throw new SafeError("Name and email are required");
 
     const admin = createAdminClient();
 
@@ -198,7 +227,9 @@ export async function invitePerson(formData: FormData) {
         if (error) throw new Error(error.message);
         companyId = data.id;
       }
-      if (!companyId) throw new Error("Choose an existing firm or enter a new company name");
+      if (!companyId) {
+        throw new SafeError("Choose an existing firm or enter a new company name");
+      }
       const { error: invErr } = await admin.from("invites").insert({
         email,
         full_name: fullName,
@@ -221,12 +252,17 @@ export async function invitePerson(formData: FormData) {
         throw new Error(invErr.message);
       }
     } else {
-      throw new Error("Choose member, admin, or company");
+      throw new SafeError("Choose member, admin, or company");
     }
 
     result = await sendAuthInvite(admin, email);
   } catch (e) {
-    redirect(`/admin/invite?error=${encodeURIComponent((e as Error).message)}`);
+    if (isControlFlowError(e)) throw e;
+    // Same rule as /join: only this file's own copy reaches the URL. A raw
+    // Postgres or GoTrue message here would put constraint and schema detail
+    // into a query string (and into any log or referrer that carries it).
+    const message = e instanceof SafeError ? e.message : INVITE_FAILED;
+    redirect(`/admin/invite?error=${encodeURIComponent(message)}`);
   }
   return finishInvite(email, result);
 }
@@ -238,7 +274,7 @@ export async function reviewJoinRequest(formData: FormData) {
   const decision = String(formData.get("decision"));
   const supabase = await createClient();
   if (decision === "rejected") {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("company_join_requests")
       .update({
         status: "rejected",
@@ -246,8 +282,15 @@ export async function reviewJoinRequest(formData: FormData) {
         reviewed_at: new Date().toISOString(),
         admin_note: emptyToNull(formData.get("admin_note")),
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (!data?.length) {
+      // This update has no status filter, so an already-reviewed row still
+      // matches and returns a row. Zero rows can only mean the request was
+      // deleted, or RLS refused the write.
+      denyRedirect("/admin/requests", "join_request_reject_failed");
+    }
     revalidatePath("/admin/requests");
     return;
   }
@@ -289,7 +332,7 @@ export async function reviewJoinRequest(formData: FormData) {
     await stashManualInvite(req.contact_email, invite.password);
   }
 
-  const { error: updErr } = await admin
+  const { data: approved, error: updErr } = await admin
     .from("company_join_requests")
     .update({
       status: "approved",
@@ -298,11 +341,18 @@ export async function reviewJoinRequest(formData: FormData) {
       company_id: company.id,
     })
     .eq("id", id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
   if (updErr) throw new Error(updErr.message);
   revalidatePath("/admin/requests");
   revalidatePath("/admin/companies");
   revalidatePath("/admin/invite");
+  // The .eq("status", "pending") filter means zero rows here is a race: another
+  // admin reviewed this request between the check above and now. The firm and
+  // the invite were still created, so say so rather than reporting success.
+  if (!approved?.length) {
+    denyRedirect("/admin/requests", "join_request_review_race");
+  }
   if (invite.via === "manual") {
     redirect("/admin/invite?manual=1");
   }
@@ -312,11 +362,15 @@ export async function toggleSponsor(formData: FormData) {
   const profile = await requireProfile();
   if (!profile.is_admin) throw new Error("Admins only");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("companies")
     .update({ is_sponsor: formData.get("is_sponsor") === "true" })
-    .eq("id", String(formData.get("id")));
+    .eq("id", String(formData.get("id")))
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    denyRedirect("/admin/companies", "sponsor_toggle_failed");
+  }
   revalidatePath("/admin/companies");
 }
 

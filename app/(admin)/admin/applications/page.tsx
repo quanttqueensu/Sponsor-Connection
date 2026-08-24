@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { updateApplicationStage } from "@/lib/actions/applications";
 import { createClient } from "@/lib/supabase/server";
@@ -5,7 +6,12 @@ import type { Application } from "@/lib/types";
 
 const stages = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
 
-export default async function AdminApplicationsPage() {
+export default async function AdminApplicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
   const { data: apps } = await supabase
     .from("applications")
@@ -15,11 +21,12 @@ export default async function AdminApplicationsPage() {
   return (
     <>
       <PageHeader kicker="Pipeline" title="All applications" />
+      <Notice message={sp.denied} />
       <ul>
         {(apps as Application[] | null)?.map((a) => (
           <li key={a.id} className="border-t border-white/10 py-3 text-sm">
             <span className="text-white">{a.profiles?.full_name}</span>
-            <span className="text-white/45">
+            <span className="text-white/60">
               {" "}
               · {a.kind === "in_app" ? a.posts?.title : a.company_name} · {a.kind}
             </span>

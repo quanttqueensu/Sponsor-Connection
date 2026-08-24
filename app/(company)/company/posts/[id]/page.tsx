@@ -36,7 +36,7 @@ export default async function CompanyPostPage({
 
   return (
     <>
-      <p className="text-[11px] uppercase tracking-wider text-blue-light/70">{kindLabel(p.kind)}</p>
+      <p className="text-[11px] uppercase tracking-wider text-blue-light">{kindLabel(p.kind)}</p>
       <h1 className="mt-1 font-heading text-3xl font-bold text-white">{p.title}</h1>
       <p className="mt-4 whitespace-pre-wrap text-sm text-white/70">{p.body}</p>
       {isPlatformJob(p) && (

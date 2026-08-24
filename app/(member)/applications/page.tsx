@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { logOffPlatform, updateApplicationStage } from "@/lib/actions/applications";
@@ -8,7 +9,12 @@ import { redirect } from "next/navigation";
 
 const stages = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
 
-export default async function ApplicationsPage() {
+export default async function ApplicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -21,12 +27,13 @@ export default async function ApplicationsPage() {
   return (
     <>
       <PageHeader kicker="Pipeline" title="My applications" />
+      <Notice message={sp.denied} />
       <ul className="space-y-4">
         {(apps as Application[] | null)?.map((a) => (
           <li key={a.id} className="border-t border-white/10 py-4">
             <p className="text-white">
               {a.kind === "in_app" ? a.posts?.title : a.company_name}{" "}
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-white/60">
                 {a.kind === "in_app" ? a.package_name : "off-platform"} · {a.stage}
               </span>
             </p>

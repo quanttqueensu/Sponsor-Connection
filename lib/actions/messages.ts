@@ -64,10 +64,16 @@ export async function sendMessage(formData: FormData) {
 
   const col =
     profile.role === "company_user" ? "company_last_read_at" : "member_last_read_at";
-  await supabase
+  // No zero-row branch here on purpose: the messages insert above already
+  // passed, and for both roles conversations_member_update /
+  // conversations_company_update are strictly weaker than the messages insert
+  // policy, so a sender who could post into this thread can always stamp its
+  // read marker. A refusal is unreachable rather than merely unlikely.
+  const { error: touchErr } = await supabase
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
     .eq("id", conversationId);
+  if (touchErr) throw new Error(touchErr.message);
 
   await notify({
     type: "message",
@@ -87,10 +93,20 @@ export async function markRead(conversationId: string) {
   const q = supabase
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
-    .eq("id", conversationId);
-  const { error } =
+    .eq("id", conversationId)
+    .select("id");
+  const { data, error } =
     profile.role === "company_user"
       ? await q
       : await q.eq("member_id", profile.id);
   if (error) throw new Error("Could not update conversation");
+  // Deliberately NOT a denyRedirect: markRead is invoked from after() while a
+  // page renders, where redirect() has no request to unwind. A refused read
+  // marker is cosmetic — the thread render itself is already RLS-scoped — so
+  // it is logged for the server operator instead of shown to the user.
+  if (!data?.length) {
+    console.warn(
+      `markRead: conversation ${conversationId} refused for profile ${profile.id}`,
+    );
+  }
 }

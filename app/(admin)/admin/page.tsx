@@ -19,7 +19,7 @@ export default async function AdminHome() {
     { href: "/admin/companies", label: "Companies", hint: "Sponsors, firms, and the /join link" },
     { href: "/admin/requests", label: "Join requests", hint: `${pending ?? 0} pending` },
     { href: "/admin/applications", label: "Applications", hint: `${apps ?? 0} total` },
-    { href: "/admin/posts", label: "New post", hint: "Event, connection, job link" },
+    { href: "/admin/posts", label: "Posts", hint: "Review, close, or write a post" },
   ];
 
   return (
@@ -33,7 +33,7 @@ export default async function AdminHome() {
           <li key={l.href}>
             <Link href={l.href} className="block border border-white/10 p-5 hover:border-white/20">
               <p className="font-heading text-lg font-bold text-white">{l.label}</p>
-              <p className="mt-1 text-sm text-white/45">{l.hint}</p>
+              <p className="mt-1 text-sm text-white/60">{l.hint}</p>
             </Link>
           </li>
         ))}

@@ -33,7 +33,7 @@ export default async function LoginPage({
         </Field>
         <PrimaryButton type="submit">Log in</PrimaryButton>
       </form>
-      <p className="mt-8 text-sm text-white/45">
+      <p className="mt-8 text-sm text-white/60">
         Hiring for your firm?{" "}
         <Link href="/join" className="text-blue-light hover:text-white">
           Request access

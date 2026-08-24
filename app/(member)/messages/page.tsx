@@ -28,7 +28,7 @@ export default async function MessagesPage() {
         ))}
       </ul>
       {!(convos ?? []).length && (
-        <p className="text-sm text-white/45">No threads yet. Message a company from a post.</p>
+        <p className="text-sm text-white/60">No threads yet. Message a company from a post.</p>
       )}
     </>
   );

@@ -5,12 +5,14 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { PostKind } from "@/lib/types";
+import { denyRedirect } from "./deny";
 
 export async function createPost(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
   const kind = String(formData.get("kind")) as PostKind;
-  const externalUrl = httpUrlOrNull(formData.get("external_url"));
+  const postFormPath =
+    profile.role === "company_user" ? "/company/posts/new" : "/admin/posts/new";
 
   let companyId: string | null = emptyToNull(formData.get("company_id"));
   if (profile.role === "company_user") {
@@ -28,6 +30,29 @@ export async function createPost(formData: FormData) {
     throw new Error("Only companies and admins can post");
   }
 
+  // Validated only after authorization: a plain member forging this call must
+  // be told they cannot post at all, not redirected to a form they cannot open.
+  const parsedUrl = httpUrlOrNull(formData.get("external_url"));
+  if (parsedUrl === INVALID_URL) {
+    denyRedirect(postFormPath, "post_url_invalid");
+  }
+  const externalUrl = parsedUrl;
+
+  const roleType = emptyToNull(formData.get("role_type"));
+  const termSeason = emptyToNull(formData.get("term_season"));
+  const termYear = Number(formData.get("term_year")) || null;
+
+  const isInApp = kind === "job" && !externalUrl;
+  if (isInApp && (!roleType || !termSeason || !termYear)) {
+    denyRedirect(postFormPath, "post_term_fields_required");
+  }
+
+  // job_link_has_url (0001_init.sql:133) requires external_url on a job_link.
+  // Without this guard a blank URL reaches the database and crashes.
+  if (kind === "job_link" && !externalUrl) {
+    denyRedirect(postFormPath, "post_job_link_url_required");
+  }
+
   const { error } = await supabase.from("posts").insert({
     author_id: profile.id,
     company_id: companyId,
@@ -38,10 +63,9 @@ export async function createPost(formData: FormData) {
     starts_at: emptyToNull(formData.get("starts_at")),
     published: true,
     status: "open",
-    role_type: kind === "job" && !externalUrl ? emptyToNull(formData.get("role_type")) : null,
-    term_season: kind === "job" && !externalUrl ? emptyToNull(formData.get("term_season")) : null,
-    term_year:
-      kind === "job" && !externalUrl ? Number(formData.get("term_year")) || null : null,
+    role_type: isInApp ? roleType : null,
+    term_season: isInApp ? termSeason : null,
+    term_year: isInApp ? termYear : null,
     external_url: kind === "job_link" || kind === "job" ? externalUrl : null,
   });
   if (error) throw new Error(error.message);
@@ -65,13 +89,30 @@ export async function addComment(formData: FormData) {
 }
 
 export async function closePost(formData: FormData) {
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase
+  const id = String(formData.get("id"));
+
+  const { data, error } = await supabase
     .from("posts")
     .update({ status: "closed" })
-    .eq("id", String(formData.get("id")));
+    .eq("id", id)
+    .select("id");
+
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    // posts_admin_write is `for all`, so an admin matching zero rows means the
+    // post is gone — never that it belongs to someone else. Only the company
+    // policy is firm-scoped, and a plain member cannot close anything.
+    if (profile.role === "company_user") {
+      denyRedirect("/company", "post_close_not_yours");
+    }
+    if (profile.is_admin) {
+      denyRedirect("/admin/posts", "post_close_missing");
+    }
+    denyRedirect("/feed", "post_close_forbidden");
+  }
+
   revalidatePath("/company");
   revalidatePath("/feed");
 }
@@ -81,17 +122,25 @@ function emptyToNull(v: FormDataEntryValue | null) {
   return s.length ? s : null;
 }
 
-function httpUrlOrNull(v: FormDataEntryValue | null) {
+/**
+ * Sentinel for a URL the user typed that we will not accept. The browser's
+ * type="url" check is looser than the protocol check below (it lets ftp://
+ * through), so a bad value is a correctable user mistake, not an exceptional
+ * state — the caller surfaces it with denyRedirect rather than crashing.
+ */
+const INVALID_URL = Symbol("invalid-url");
+
+function httpUrlOrNull(
+  v: FormDataEntryValue | null,
+): string | null | typeof INVALID_URL {
   const s = emptyToNull(v);
   if (!s) return null;
+  let u: URL;
   try {
-    const u = new URL(s);
-    if (u.protocol !== "https:" && u.protocol !== "http:") {
-      throw new Error("Listing URL must be http or https");
-    }
-    return u.toString();
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("Listing")) throw e;
-    throw new Error("Invalid listing URL");
+    u = new URL(s);
+  } catch {
+    return INVALID_URL;
   }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return INVALID_URL;
+  return u.toString();
 }

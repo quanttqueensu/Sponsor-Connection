@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import CopyLink from "@/components/CopyLink";
 import { toggleSponsor } from "@/lib/actions/admin";
@@ -6,7 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
 import Link from "next/link";
 
-export default async function CompaniesPage() {
+export default async function CompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
   const { data: companies } = await supabase.from("companies").select("*").order("name");
 
@@ -18,8 +24,9 @@ export default async function CompaniesPage() {
           Invite a company contact
         </Link>
       </PageHeader>
+      <Notice message={sp.denied} />
       <div className="mb-10 border border-white/10 p-5">
-        <p className="text-[11px] uppercase tracking-[2px] text-white/45">Public signup link</p>
+        <p className="text-[11px] uppercase tracking-[2px] text-white/60">Public signup link</p>
         <p className="mt-2 text-sm text-white/60">
           Firms can request access here. You approve them under Join requests, or invite a contact
           directly.
@@ -33,7 +40,7 @@ export default async function CompaniesPage() {
           <li key={c.id} className="flex items-center justify-between border-t border-white/10 py-3">
             <span className="text-white">
               {c.name}{" "}
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-white/60">
                 {c.is_sponsor ? "sponsor" : "firm"} · {c.status}
               </span>
             </span>

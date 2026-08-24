@@ -43,7 +43,7 @@ export default function InviteForm({
     <form action={invitePerson} className="space-y-6">
       <input type="hidden" name="kind" value={kind} />
       <fieldset>
-        <legend className="text-[11px] uppercase tracking-wider text-white/45">Who is this?</legend>
+        <legend className="text-[11px] uppercase tracking-wider text-white/60">Who is this?</legend>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           {KINDS.map((option) => {
             const selected = kind === option.id;
@@ -57,7 +57,7 @@ export default function InviteForm({
                 }`}
               >
                 <p className="font-heading text-base font-bold text-white">{option.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-white/50">{option.hint}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/60">{option.hint}</p>
               </button>
             );
           })}

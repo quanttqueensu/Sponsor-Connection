@@ -1,3 +1,4 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import ManualInviteBanner from "@/components/ManualInviteBanner";
 import { readManualInvite, reviewJoinRequest } from "@/lib/actions/admin";
@@ -7,9 +8,9 @@ import type { JoinRequest } from "@/lib/types";
 export default async function RequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ manual?: string }>;
+  searchParams: Promise<{ manual?: string; denied?: string }>;
 }) {
-  const { manual } = await searchParams;
+  const { manual, denied } = await searchParams;
   const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
   const { data: requests } = await supabase
@@ -21,6 +22,7 @@ export default async function RequestsPage({
   return (
     <>
       <PageHeader kicker="Queue" title="Join requests" />
+      <Notice message={denied} />
       {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
       <ul>
         {(requests as JoinRequest[] | null)?.map((r) => (
@@ -42,13 +44,13 @@ export default async function RequestsPage({
               <form action={reviewJoinRequest}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="decision" value="rejected" />
-                <button className="text-xs uppercase tracking-wider text-white/40">Reject</button>
+                <button className="text-xs uppercase tracking-wider text-white/60">Reject</button>
               </form>
             </div>
           </li>
         ))}
       </ul>
-      {!(requests ?? []).length && <p className="text-sm text-white/45">No pending requests.</p>}
+      {!(requests ?? []).length && <p className="text-sm text-white/60">No pending requests.</p>}
     </>
   );
 }

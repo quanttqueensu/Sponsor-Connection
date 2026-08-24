@@ -11,7 +11,7 @@ export default async function JoinPage({
 
   return (
     <div className="mx-auto max-w-lg px-6 py-24">
-      <p className="text-[11px] uppercase tracking-[2px] text-blue-light/70">Sponsors</p>
+      <p className="text-[11px] uppercase tracking-[2px] text-blue-light">Sponsors</p>
       <h1 className="mt-2 font-heading text-3xl font-bold text-white">Request hub access</h1>
       <p className="mt-3 text-sm text-white/60">
         Share this page with hiring contacts. QUANTT execs review each request and send an
@@ -42,7 +42,7 @@ export default async function JoinPage({
           <PrimaryButton type="submit">Submit request</PrimaryButton>
         </form>
       )}
-      <p className="mt-8 text-sm text-white/40">
+      <p className="mt-8 text-sm text-white/60">
         Already invited?{" "}
         <Link href="/login" className="text-blue-light hover:text-white">
           Log in
