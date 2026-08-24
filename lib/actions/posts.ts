@@ -29,6 +29,18 @@ export async function createPost(formData: FormData) {
     throw new Error("Only companies and admins can post");
   }
 
+  const roleType = emptyToNull(formData.get("role_type"));
+  const termSeason = emptyToNull(formData.get("term_season"));
+  const termYear = Number(formData.get("term_year")) || null;
+
+  const isInApp = kind === "job" && !externalUrl;
+  if (isInApp && (!roleType || !termSeason || !termYear)) {
+    denyRedirect(
+      profile.role === "company_user" ? "/company/posts/new" : "/admin/posts",
+      "In-app jobs need a role type, term season, and term year. Add an external listing URL instead if you want to link out.",
+    );
+  }
+
   const { error } = await supabase.from("posts").insert({
     author_id: profile.id,
     company_id: companyId,
@@ -39,10 +51,9 @@ export async function createPost(formData: FormData) {
     starts_at: emptyToNull(formData.get("starts_at")),
     published: true,
     status: "open",
-    role_type: kind === "job" && !externalUrl ? emptyToNull(formData.get("role_type")) : null,
-    term_season: kind === "job" && !externalUrl ? emptyToNull(formData.get("term_season")) : null,
-    term_year:
-      kind === "job" && !externalUrl ? Number(formData.get("term_year")) || null : null,
+    role_type: isInApp ? roleType : null,
+    term_season: isInApp ? termSeason : null,
+    term_year: isInApp ? termYear : null,
     external_url: kind === "job_link" || kind === "job" ? externalUrl : null,
   });
   if (error) throw new Error(error.message);

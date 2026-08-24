@@ -1,8 +1,14 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import PostForm from "@/components/PostForm";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function AdminNewPost() {
+export default async function AdminNewPost({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
   const { data: companies } = await supabase
     .from("companies")
@@ -15,6 +21,7 @@ export default async function AdminNewPost() {
       <PageHeader kicker="Feed" title="New post">
         Members will see this on the global feed. Companies only see it if you attach their firm.
       </PageHeader>
+      <Notice message={sp.denied} />
       <PostForm
         kinds={["job", "job_link", "event", "announcement", "connection"]}
         companies={companies ?? []}
