@@ -128,7 +128,11 @@ export async function updateApplicationStage(formData: FormData) {
   if (error) throw new Error(error.message);
   if (!data?.length) {
     denyRedirect(
-      profile.role === "company_user" ? "/company/applicants" : "/applications",
+      profile.role === "company_user"
+        ? "/company/applicants"
+        : profile.is_admin
+          ? "/admin/applications"
+          : "/applications",
       "That application could not be updated.",
     );
   }

@@ -90,7 +90,11 @@ export async function closePost(formData: FormData) {
   if (error) throw new Error(error.message);
   if (!data?.length) {
     denyRedirect(
-      profile.role === "company_user" ? "/company" : "/admin",
+      profile.role === "company_user"
+        ? "/company"
+        : profile.is_admin
+          ? "/admin/posts"
+          : "/feed",
       "That post could not be closed. It may belong to another firm.",
     );
   }
