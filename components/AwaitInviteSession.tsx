@@ -10,9 +10,7 @@ export default function AwaitInviteSession() {
     const timeout = window.setTimeout(() => {
       if (!window.location.hash.includes("access_token")) {
         setMessage("Sign in link expired. Ask for a new invite.");
-        window.location.replace(
-          "/login?error=" + encodeURIComponent("Sign in link expired. Ask for a new invite."),
-        );
+        window.location.replace("/login?error=login_link_expired");
       }
     }, 2500);
     return () => window.clearTimeout(timeout);

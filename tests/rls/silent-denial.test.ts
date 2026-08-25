@@ -113,6 +113,13 @@ describe("RLS denial is observable", () => {
       "post_close_not_yours",
       "post_close_forbidden",
       "join_request_reject_failed",
+      "join_request_failed",
+      "invite_failed",
+      "login_failed",
+      "application_package_path_invalid",
+      "message_invalid",
+      "post_invalid",
+      "profile_photo_invalid",
     ]) {
       expect(DENIAL_MESSAGES[code]).toBeTruthy();
     }

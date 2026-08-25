@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
-import { denialMessage } from "@/lib/denials";
 import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,19 +18,6 @@ const MANUAL_INVITE_COOKIE = "hub_manual_invite";
  */
 const MANUAL_INVITE_PATH = "/admin";
 const MANUAL_INVITE_MAX_AGE = 120;
-
-const JOIN_REQUEST_FAILED =
-  "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.";
-
-const INVITE_FAILED =
-  "That invite could not be sent. Check the details and try again, or contact another exec if it keeps failing.";
-
-/**
- * An error whose message is safe to show the user: it is copy this file wrote,
- * not text from Postgres or GoTrue. Anything else is reported generically so a
- * redirect target never reflects driver output back out of the app.
- */
-class SafeError extends Error {}
 
 /**
  * The address already has an auth account.
@@ -214,14 +200,37 @@ async function sendAuthInvite(
   throw new Error(message);
 }
 
-export async function requestAccess(formData: FormData) {
+/**
+ * Not exported: this file is `"use server"`, so every export is a callable
+ * endpoint. A public wrapper must never put driver text (unique-index names,
+ * whether an email already requested access) on the wire.
+ */
+async function insertJoinRequest(formData: FormData) {
+  const companyName = String(formData.get("company_name") ?? "").trim();
+  const contactName = String(formData.get("contact_name") ?? "").trim();
+  const contactEmail = String(formData.get("contact_email") ?? "").trim();
+  const website = httpUrlOrNull(formData.get("website"));
+  const note = emptyToNull(formData.get("note"));
+
+  if (
+    !companyName ||
+    companyName.length > MAX_COMPANY_NAME ||
+    !contactName ||
+    contactName.length > MAX_CONTACT_NAME ||
+    !isEmail(contactEmail) ||
+    website === INVALID_URL ||
+    overLimit(note, MAX_NOTE)
+  ) {
+    throw new Error("invalid join request");
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("company_join_requests").insert({
-    company_name: String(formData.get("company_name") ?? "").trim(),
-    website: emptyToNull(formData.get("website")),
-    contact_name: String(formData.get("contact_name") ?? "").trim(),
-    contact_email: String(formData.get("contact_email") ?? "").trim(),
-    note: emptyToNull(formData.get("note")),
+    company_name: companyName,
+    website,
+    contact_name: contactName,
+    contact_email: contactEmail,
+    note,
     status: "pending",
   });
   if (error) throw new Error(error.message);
@@ -229,21 +238,22 @@ export async function requestAccess(formData: FormData) {
     type: "join_request",
     to: [],
     subject: "Company access request",
-    body: String(formData.get("company_name")),
+    body: companyName,
   });
 }
 
 export async function submitCompanyRequest(formData: FormData) {
   try {
-    await requestAccess(formData);
+    await insertJoinRequest(formData);
   } catch (e) {
     if (isControlFlowError(e)) throw e;
     // /join is public and unauthenticated. The pending-email unique index means
     // a duplicate submission comes back as a 23505 naming the constraint, so
     // echoing the driver text would confirm whether an address has already
     // requested access (email enumeration) and disclose schema besides. One
-    // fixed message for every failure, distinguishing nothing.
-    redirect(`/join?error=${encodeURIComponent(JOIN_REQUEST_FAILED)}`);
+    // opaque code for every failure, distinguishing nothing — and the page
+    // looks the code up rather than rendering ?error= text.
+    redirect("/join?error=join_request_failed");
   }
   redirect("/join?sent=1");
 }
@@ -276,11 +286,14 @@ export async function invitePerson(formData: FormData) {
   let admin: ReturnType<typeof createAdminClient> | null = null;
   try {
     const profile = await requireProfile();
-    if (!profile.is_admin) throw new SafeError("Admins only");
+    if (!profile.is_admin) denyRedirect("/admin/invite", "invite_failed");
     profileId = profile.id;
     const kind = String(formData.get("kind") ?? "member");
     const fullName = String(formData.get("full_name") ?? "").trim();
-    if (!email || !fullName) throw new SafeError("Name and email are required");
+    if (!email || !fullName) denyRedirect("/admin/invite", "invite_name_email_required");
+    if (kind !== "company" && kind !== "member" && kind !== "admin") {
+      denyRedirect("/admin/invite", "invite_kind_invalid");
+    }
 
     admin = createAdminClient();
 
@@ -302,7 +315,7 @@ export async function invitePerson(formData: FormData) {
         companyId = data.id;
       }
       if (!companyId) {
-        throw new SafeError("Choose an existing firm or enter a new company name");
+        denyRedirect("/admin/invite", "invite_company_required");
       }
       const { data: row, error: invErr } = await admin
         .from("invites")
@@ -319,7 +332,7 @@ export async function invitePerson(formData: FormData) {
         throw new Error(invErr.message);
       }
       insertedInviteId = row?.id ?? null;
-    } else if (kind === "member" || kind === "admin") {
+    } else {
       const { data: row, error: invErr } = await admin
         .from("invites")
         .insert({
@@ -335,8 +348,6 @@ export async function invitePerson(formData: FormData) {
         throw new Error(invErr.message);
       }
       insertedInviteId = row?.id ?? null;
-    } else {
-      throw new SafeError("Choose member, admin, or company");
     }
 
     result = await sendAuthInvite(admin, email);
@@ -352,16 +363,14 @@ export async function invitePerson(formData: FormData) {
         .then(undefined, () => undefined);
       revalidatePath("/admin/invite");
     }
-    // Same rule as /join: only this file's own copy reaches the URL. A raw
-    // Postgres or GoTrue message here would put constraint and schema detail
-    // into a query string (and into any log or referrer that carries it).
-    const message =
+    // Opaque code, never driver text: InviteForm/Notice look it up, so a
+    // crafted ?denied= (or leftover ?error=) cannot put attacker copy in chrome.
+    denyRedirect(
+      "/admin/invite",
       e instanceof AlreadyRegisteredError
-        ? denialMessage("invite_email_already_registered")
-        : e instanceof SafeError
-          ? e.message
-          : INVITE_FAILED;
-    redirect(`/admin/invite?error=${encodeURIComponent(message)}`);
+        ? "invite_email_already_registered"
+        : "invite_failed",
+    );
   }
   return finishInvite(email, profileId, result);
 }
@@ -497,7 +506,39 @@ export async function toggleSponsor(formData: FormData) {
   revalidatePath("/admin/companies");
 }
 
+const MAX_COMPANY_NAME = 200;
+const MAX_CONTACT_NAME = 120;
+const MAX_EMAIL = 254;
+const MAX_NOTE = 2000;
+const MAX_URL = 500;
+
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;
+}
+
+function overLimit(v: string | null, max: number) {
+  return v !== null && v.length > max;
+}
+
+function isEmail(value: string) {
+  return value.length > 0 && value.length <= MAX_EMAIL && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+const INVALID_URL = Symbol("invalid-url");
+
+function httpUrlOrNull(
+  v: FormDataEntryValue | null,
+): string | null | typeof INVALID_URL {
+  const s = emptyToNull(v);
+  if (!s) return null;
+  if (s.length > MAX_URL) return INVALID_URL;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return INVALID_URL;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return INVALID_URL;
+  return u.toString();
 }

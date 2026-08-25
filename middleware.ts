@@ -39,6 +39,11 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
+    // Fail closed in production: without these the rest of this function
+    // cannot authenticate, and returning next() would make every route public.
+    if (process.env.NODE_ENV === "production") {
+      return new NextResponse("Service unavailable", { status: 503 });
+    }
     return supabaseResponse;
   }
 

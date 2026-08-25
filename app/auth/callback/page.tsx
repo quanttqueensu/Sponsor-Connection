@@ -23,7 +23,7 @@ export default function AuthCallbackPage() {
 
       try {
         if (hash.error) {
-          throw new Error(hash.error_description || hash.error);
+          throw new Error("login_link_expired");
         }
 
         if (code) {
@@ -42,13 +42,13 @@ export default function AuthCallbackPage() {
           const {
             data: { session },
           } = await supabase.auth.getSession();
-          if (!session) throw new Error("Invite link expired. Ask for a new invite.");
+          if (!session) throw new Error("login_link_expired");
         }
 
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) throw new Error("Invite link expired. Ask for a new invite.");
+        if (!user) throw new Error("login_link_expired");
 
         const needsPassword = isPasswordSetupAuthType(type) || userNeedsPassword(user);
         if (needsPassword) {
@@ -56,11 +56,10 @@ export default function AuthCallbackPage() {
         }
 
         window.location.replace(needsPassword ? "/auth/set-password" : "/");
-      } catch (e) {
+      } catch {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : "Invite link expired";
-        setMessage(msg);
-        window.location.replace(`/login?error=${encodeURIComponent(msg)}`);
+        setMessage("That sign-in link didn't work.");
+        window.location.replace("/login?error=login_link_expired");
       }
     }
 

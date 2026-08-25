@@ -1,6 +1,7 @@
 import PageHeader from "@/components/PageHeader";
 import InviteForm from "@/components/InviteForm";
 import ManualInviteBanner from "@/components/ManualInviteBanner";
+import Notice from "@/components/Notice";
 import { readManualInvite } from "@/lib/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
@@ -8,9 +9,9 @@ import type { Company } from "@/lib/types";
 export default async function InvitePage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string; manual?: string; kind?: string }>;
+  searchParams: Promise<{ sent?: string; denied?: string; manual?: string; kind?: string }>;
 }) {
-  const { sent, error, manual, kind } = await searchParams;
+  const { sent, denied, manual, kind } = await searchParams;
   const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
   const [{ data: companies }, { data: pending }] = await Promise.all([
@@ -32,10 +33,10 @@ export default async function InvitePage({
         password link when we can; otherwise you’ll get a temporary password to share.
       </PageHeader>
       {setup && <ManualInviteBanner email={setup.email} password={setup.password} />}
+      <Notice message={denied} />
       <InviteForm
         companies={(companies as Pick<Company, "id" | "name">[] | null) ?? []}
         initialKind={initialKind}
-        error={error}
         sent={Boolean(sent)}
       />
       <section className="mt-14">

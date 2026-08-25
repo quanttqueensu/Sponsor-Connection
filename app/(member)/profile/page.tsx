@@ -44,7 +44,7 @@ export default async function ProfilePage({
       <Notice message={sp.denied} />
       <form action={uploadPhoto} encType="multipart/form-data" className="mb-8 flex items-end gap-3">
         <Field label="Photo">
-          <input type="file" name="photo" accept="image/*" />
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" />
         </Field>
         <PrimaryButton type="submit">Upload</PrimaryButton>
       </form>

@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { denyRedirect } from "./deny";
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024;
+const MAX_NAME = 120;
+const MAX_URL = 500;
+const MAX_COVER = 4000;
 
 /**
  * Rejects anything that is not really a PDF.
@@ -52,6 +55,19 @@ export async function createPackage(formData: FormData) {
   if (!file || file.size === 0) throw new Error("Upload a resume PDF");
   await assertPdf(file, "Resume");
 
+  const name = String(formData.get("name") ?? "").trim();
+  const linkedinUrl = String(formData.get("linkedin_url") ?? "").trim();
+  const coverLetter = emptyToNull(formData.get("cover_letter"));
+  if (
+    !name ||
+    name.length > MAX_NAME ||
+    !linkedinUrl ||
+    linkedinUrl.length > MAX_URL ||
+    (coverLetter !== null && coverLetter.length > MAX_COVER)
+  ) {
+    denyRedirect("/packages", "package_invalid");
+  }
+
   const supabase = await createClient();
   const id = crypto.randomUUID();
   // Every object this invocation has written, so any later failure can undo
@@ -89,10 +105,10 @@ export async function createPackage(formData: FormData) {
   const { error } = await supabase.from("hiring_packages").insert({
     id,
     member_id: profile.id,
-    name: String(formData.get("name") ?? "").trim(),
-    linkedin_url: String(formData.get("linkedin_url") ?? "").trim(),
+    name,
+    linkedin_url: linkedinUrl,
     resume_path: resumePath,
-    cover_letter: emptyToNull(formData.get("cover_letter")),
+    cover_letter: coverLetter,
     cover_letter_path: coverPath,
     is_default: formData.get("is_default") === "on",
   });

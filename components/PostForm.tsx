@@ -67,13 +67,13 @@ export default function PostForm({
         </Field>
       )}
       <Field label="Title">
-        <TextInput name="title" required />
+        <TextInput name="title" required maxLength={200} />
       </Field>
       <Field label="Body">
-        <TextArea name="body" rows={6} required />
+        <TextArea name="body" rows={6} required maxLength={8000} />
       </Field>
       <Field label="Location">
-        <TextInput name="location" />
+        <TextInput name="location" maxLength={120} />
       </Field>
       {isEvent && (
         <Field label="Starts at (optional)">

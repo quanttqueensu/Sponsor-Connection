@@ -15,9 +15,7 @@ export default function AuthHashCatcher() {
 
     const parsed = parseAuthHash(window.location.hash);
     if (parsed.error) {
-      window.location.replace(
-        `/login?error=${encodeURIComponent(parsed.error_description || parsed.error)}`,
-      );
+      window.location.replace("/login?error=login_link_expired");
       return;
     }
     if (!parsed.access_token || !parsed.refresh_token) return;
@@ -30,7 +28,7 @@ export default function AuthHashCatcher() {
       })
       .then(async ({ error }) => {
         if (error) {
-          window.location.replace(`/login?error=${encodeURIComponent(error.message)}`);
+          window.location.replace("/login?error=login_failed");
           return;
         }
         if (isPasswordSetupAuthType(parsed.type)) {

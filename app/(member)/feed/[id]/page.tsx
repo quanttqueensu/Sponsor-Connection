@@ -14,16 +14,20 @@ import {
   type PostComment,
 } from "@/lib/types";
 import { Field, PrimaryButton, TextArea } from "@/components/Form";
+import Notice from "@/components/Notice";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate } from "@/lib/time";
 
 export default async function PostDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ denied?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   const supabase = await createClient();
   const { data: post } = await supabase
@@ -68,6 +72,7 @@ export default async function PostDetailPage({
         {kindLabel(p.kind)}
         {p.companies?.is_sponsor ? " · Sponsor" : ""}
       </p>
+      <Notice message={sp.denied} />
       <h1 className="mt-2 font-heading text-3xl font-bold text-white">{p.title}</h1>
       <p className="mt-2 text-sm text-white/55">
         {[
@@ -192,7 +197,7 @@ export default async function PostDetailPage({
                 </select>
               </Field>
               <Field label="New letter (if writing)">
-                <TextArea name="cover_letter" rows={5} />
+                <TextArea name="cover_letter" rows={5} maxLength={4000} />
               </Field>
               <Field label="PDF (if uploading)">
                 <input type="file" name="cover_pdf" accept="application/pdf" />
@@ -216,7 +221,7 @@ export default async function PostDetailPage({
         {profile?.role === "member" && (
           <form action={addComment} className="mt-6 max-w-lg space-y-3">
             <input type="hidden" name="post_id" value={p.id} />
-            <TextArea name="body" rows={3} required placeholder="Add a comment" />
+            <TextArea name="body" rows={3} required placeholder="Add a comment" maxLength={4000} />
             <PrimaryButton type="submit">Comment</PrimaryButton>
           </form>
         )}

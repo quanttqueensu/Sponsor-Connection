@@ -28,7 +28,10 @@ export async function login(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    // Opaque code: /login used to render ?error= text, so a crafted link or a
+    // raw GoTrue message (including user-enumeration variants) could appear in
+    // the hub's own chrome. One code, one lookup, nothing from the driver.
+    redirect("/login?error=login_failed");
   }
   redirect(await homeForUser(supabase));
 }
@@ -46,9 +49,7 @@ export async function login(formData: FormData) {
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {
-    redirect(
-      `/login?error=${encodeURIComponent("Enter your email address, then choose “Forgot your password?”.")}`,
-    );
+    redirect("/login?error=login_reset_email_required");
   }
 
   try {
@@ -87,12 +88,10 @@ export async function setPassword(formData: FormData) {
   const confirm = String(formData.get("confirm") ?? "");
 
   if (password.length < 8) {
-    redirect(
-      `/auth/set-password?error=${encodeURIComponent("Password must be at least 8 characters")}`,
-    );
+    redirect("/auth/set-password?error=password_too_short");
   }
   if (password !== confirm) {
-    redirect(`/auth/set-password?error=${encodeURIComponent("Passwords do not match")}`);
+    redirect("/auth/set-password?error=password_mismatch");
   }
 
   const supabase = await createClient();
@@ -100,12 +99,12 @@ export async function setPassword(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login?error=Sign+in+link+expired.+Ask+for+a+new+invite.");
+    redirect("/login?error=login_link_expired");
   }
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    redirect(`/auth/set-password?error=${encodeURIComponent(error.message)}`);
+    redirect("/auth/set-password?error=password_save_failed");
   }
 
   const admin = createAdminClient();
@@ -116,7 +115,7 @@ export async function setPassword(formData: FormData) {
     },
   });
   if (metaErr) {
-    redirect(`/auth/set-password?error=${encodeURIComponent(metaErr.message)}`);
+    redirect("/auth/set-password?error=password_save_failed");
   }
   await supabase.auth.refreshSession();
 

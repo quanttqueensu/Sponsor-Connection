@@ -9,6 +9,8 @@
  *   supabase/migrations/0004_resume_book_opt_in.sql — profiles.resume_book_*
  *   supabase/migrations/0005_consent_and_package_path_guards.sql — constraints
  *     only (no new columns)
+ *   supabase/migrations/0006_snapshot_path_and_photo_writes.sql — tighter
+ *     applications_guard() snapshot prefix; photos write policies (no new columns)
  *
  * If you add, rename, retype, or change the nullability of a column in a
  * migration, update the matching type in this file in the same commit.

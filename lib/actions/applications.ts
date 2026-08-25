@@ -46,6 +46,9 @@ async function assertPdf(file: File, label: string) {
 }
 
 const STAGES = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
+const MAX_COVER_LETTER = 4000;
+const MAX_COMPANY_NAME = 200;
+const MAX_NOTES = 2000;
 
 export async function applyToJob(formData: FormData) {
   const profile = await requireProfile();
@@ -69,6 +72,18 @@ export async function applyToJob(formData: FormData) {
     .eq("member_id", profile.id)
     .single();
   if (packErr || !pack) throw new Error("Choose a hiring package");
+  if (
+    typeof pack.resume_path !== "string" ||
+    !pack.resume_path.startsWith(`${profile.id}/`) ||
+    (pack.cover_letter_path &&
+      (typeof pack.cover_letter_path !== "string" ||
+        !pack.cover_letter_path.startsWith(`${profile.id}/`)))
+  ) {
+    // Service-role copy below bypasses storage RLS. The DB trigger in 0005 is
+    // the real control; this check still has to exist so a deploy that ships
+    // app code before the migration cannot copy another member's file.
+    denyRedirect("/applications", "application_package_path_invalid");
+  }
 
   const coverMode = String(formData.get("cover_mode") ?? "default");
   let coverLetter = pack.cover_letter as string | null;
@@ -83,6 +98,9 @@ export async function applyToJob(formData: FormData) {
     coverLetter = null;
   } else if (coverMode === "write") {
     coverLetter = String(formData.get("cover_letter") ?? "").trim() || null;
+    if (coverLetter && coverLetter.length > MAX_COVER_LETTER) {
+      denyRedirect("/applications", "application_cover_invalid");
+    }
   } else if (coverMode === "upload") {
     const file = formData.get("cover_pdf") as File | null;
     if (!file || file.size === 0) throw new Error("Upload a cover letter PDF");
@@ -182,9 +200,9 @@ export async function logOffPlatform(formData: FormData) {
     kind: "off_platform",
     post_id: postId,
     company_id: emptyToNull(formData.get("company_id")),
-    company_name: String(formData.get("company_name") ?? "").trim(),
+    company_name: String(formData.get("company_name") ?? "").trim().slice(0, MAX_COMPANY_NAME),
     stage: "submitted",
-    notes: emptyToNull(formData.get("notes")),
+    notes: emptyToNull(formData.get("notes"))?.slice(0, MAX_NOTES) ?? null,
   });
   if (error) {
     if (error.code === "23505") {

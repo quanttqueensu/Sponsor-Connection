@@ -75,20 +75,21 @@ export default async function PackagesPage({
       <form action={createPackage} encType="multipart/form-data" className="mt-10 max-w-lg space-y-4">
         <h2 className="font-heading text-lg font-bold text-white">New package</h2>
         <Field label="Name">
-          <TextInput name="name" required placeholder="Quant Research" />
+          <TextInput name="name" required placeholder="Quant Research" maxLength={120} />
         </Field>
         <Field label="LinkedIn URL">
           <TextInput
             name="linkedin_url"
             required
             defaultValue={profile.linkedin_url ?? ""}
+            maxLength={500}
           />
         </Field>
         <Field label="Resume PDF">
           <input type="file" name="resume" accept="application/pdf" required />
         </Field>
         <Field label="Default cover letter (optional)">
-          <TextArea name="cover_letter" rows={5} />
+          <TextArea name="cover_letter" rows={5} maxLength={4000} />
         </Field>
         <Field label="Default cover PDF (optional)">
           <input type="file" name="cover_pdf" accept="application/pdf" />

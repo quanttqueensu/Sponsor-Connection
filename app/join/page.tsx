@@ -1,5 +1,6 @@
 import { submitCompanyRequest } from "@/lib/actions/admin";
 import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
+import { DENIAL_MESSAGES } from "@/lib/denials";
 import Link from "next/link";
 
 export default async function JoinPage({
@@ -8,6 +9,7 @@ export default async function JoinPage({
   searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
   const { sent, error } = await searchParams;
+  const errorText = error ? DENIAL_MESSAGES[error] : undefined;
 
   return (
     <div className="mx-auto max-w-lg px-6 py-24">
@@ -23,21 +25,21 @@ export default async function JoinPage({
         </p>
       ) : (
         <form action={submitCompanyRequest} className="mt-10 space-y-4">
-          {error && <p className="text-sm text-red-300">{error}</p>}
+          {errorText && <p className="text-sm text-red-300">{errorText}</p>}
           <Field label="Company name">
-            <TextInput name="company_name" required />
+            <TextInput name="company_name" required maxLength={200} />
           </Field>
           <Field label="Website">
-            <TextInput name="website" type="url" />
+            <TextInput name="website" type="url" maxLength={500} />
           </Field>
           <Field label="Your name">
-            <TextInput name="contact_name" required />
+            <TextInput name="contact_name" required maxLength={120} />
           </Field>
           <Field label="Work email">
-            <TextInput name="contact_email" type="email" required />
+            <TextInput name="contact_email" type="email" required maxLength={254} />
           </Field>
           <Field label="Note">
-            <TextArea name="note" rows={4} />
+            <TextArea name="note" rows={4} maxLength={2000} />
           </Field>
           <PrimaryButton type="submit">Submit request</PrimaryButton>
         </form>

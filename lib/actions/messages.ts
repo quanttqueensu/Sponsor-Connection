@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { notify } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
+import { denyRedirect } from "./deny";
 
 export async function startConversation(formData: FormData) {
   const profile = await requireProfile();
@@ -49,12 +50,20 @@ export async function startConversation(formData: FormData) {
   redirect(path);
 }
 
+const MAX_MESSAGE_BODY = 4000;
+
 export async function sendMessage(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
   const conversationId = String(formData.get("conversation_id"));
   const body = String(formData.get("body") ?? "").trim();
-  if (!body) throw new Error("Message cannot be empty");
+  const deniedPath =
+    profile.role === "company_user"
+      ? `/company/messages/${encodeURIComponent(conversationId)}`
+      : `/messages/${encodeURIComponent(conversationId)}`;
+  if (!body || body.length > MAX_MESSAGE_BODY) {
+    denyRedirect(deniedPath, "message_invalid");
+  }
   const { error } = await supabase.from("messages").insert({
     conversation_id: conversationId,
     sender_id: profile.id,

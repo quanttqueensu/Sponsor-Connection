@@ -16,7 +16,13 @@ const supabaseOrigin = (() => {
   }
 })();
 
-const connectSrc = ["'self'", supabaseOrigin ?? "https:", "wss:"].join(" ");
+const connectSrc = [
+  "'self'",
+  supabaseOrigin ?? "https:",
+  supabaseOrigin
+    ? supabaseOrigin.replace(/^https:/, "wss:").replace(/^http:/, "ws:")
+    : "wss:",
+].join(" ");
 const imgSrc = ["'self'", "data:", "blob:", supabaseOrigin ?? "https:"].join(" ");
 
 /**

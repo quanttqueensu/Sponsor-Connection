@@ -38,6 +38,19 @@ export async function createPost(formData: FormData) {
   }
   const externalUrl = parsedUrl;
 
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const location = emptyToNull(formData.get("location"));
+  if (
+    !title ||
+    title.length > MAX_POST_TITLE ||
+    !body ||
+    body.length > MAX_POST_BODY ||
+    overLimit(location, MAX_POST_LOCATION)
+  ) {
+    denyRedirect(postFormPath, "post_invalid");
+  }
+
   const roleType = emptyToNull(formData.get("role_type"));
   const termSeason = emptyToNull(formData.get("term_season"));
   const termYear = Number(formData.get("term_year")) || null;
@@ -57,9 +70,9 @@ export async function createPost(formData: FormData) {
     author_id: profile.id,
     company_id: companyId,
     kind,
-    title: String(formData.get("title") ?? "").trim(),
-    body: String(formData.get("body") ?? "").trim(),
-    location: emptyToNull(formData.get("location")),
+    title,
+    body,
+    location,
     starts_at: emptyToNull(formData.get("starts_at")),
     published: true,
     status: "open",
@@ -129,6 +142,13 @@ export async function closePost(formData: FormData) {
 }
 
 const MAX_COMMENT_BODY = 4000;
+const MAX_POST_TITLE = 200;
+const MAX_POST_BODY = 8000;
+const MAX_POST_LOCATION = 120;
+
+function overLimit(v: string | null, max: number) {
+  return v !== null && v.length > max;
+}
 
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();

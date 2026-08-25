@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { login, requestPasswordReset } from "@/lib/actions/auth";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
+import { DENIAL_MESSAGES } from "@/lib/denials";
 
 export default async function LoginPage({
   searchParams,
@@ -9,6 +10,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
   const { error, reset } = await searchParams;
+  const errorText = error ? DENIAL_MESSAGES[error] : undefined;
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6">
       <Image
@@ -24,7 +26,7 @@ export default async function LoginPage({
         Invite-only access for members and approved companies.
       </p>
       <form action={login} className="mt-10 w-full max-w-sm space-y-4">
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {errorText && <p className="text-sm text-red-300">{errorText}</p>}
         {reset && (
           <p className="text-sm text-blue-light">
             If that address has an account, a reset link is on its way. Check your inbox — the

@@ -28,6 +28,8 @@ const MESSAGES = {
     "You do not have permission to close posts.",
   comment_invalid:
     "That comment was not posted. Write something first, and keep it under 4,000 characters.",
+  post_invalid:
+    "That post was not published. Give it a title and a body, and keep them to a reasonable length.",
 
   // lib/actions/applications.ts
   application_duplicate: "You've already applied to that job.",
@@ -37,6 +39,19 @@ const MESSAGES = {
     "That posting no longer exists, so the application was not logged. Log it without a posting instead.",
   stage_invalid: "That is not a valid application stage.",
   application_update_failed: "That application could not be updated.",
+  application_package_path_invalid:
+    "That hiring package could not be used. Recreate it from Hiring packages, then apply again.",
+  application_cover_invalid:
+    "That application was not submitted. Keep the cover letter under 4,000 characters, or upload a PDF instead.",
+
+  // lib/actions/auth.ts
+  login_failed: "Could not log in. Check your email and password and try again.",
+  login_reset_email_required:
+    "Enter your email address, then choose “Forgot your password?”.",
+  login_link_expired: "That sign-in link expired. Ask for a new invite, or use “Forgot your password?”.",
+  password_too_short: "Password must be at least 8 characters.",
+  password_mismatch: "Passwords do not match.",
+  password_save_failed: "That password could not be saved. Try again, or ask for a new invite.",
 
   // lib/actions/admin.ts
   join_request_reject_failed:
@@ -47,6 +62,13 @@ const MESSAGES = {
     "The firm was created and the request approved, but that contact address already has a Hub account, so no invite was sent and their account was not touched. They are not attached to the new firm yet — invite a different contact for the firm, or have them tell an exec which account to link.",
   invite_email_already_registered:
     "That address already has a Hub account, so no invite was sent and nothing about the account was changed. Ask them to log in — if they cannot get in, they can use “Forgot your password?” on the login page. Re-inviting never changes an existing account's role.",
+  invite_failed:
+    "That invite could not be sent. Check the details and try again, or contact another exec if it keeps failing.",
+  invite_name_email_required: "Name and email are required.",
+  invite_company_required: "Choose an existing firm or enter a new company name.",
+  invite_kind_invalid: "Choose member, admin, or company.",
+  join_request_failed:
+    "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.",
   sponsor_toggle_failed:
     "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
 
@@ -56,6 +78,12 @@ const MESSAGES = {
   package_missing: "That package no longer exists.",
   package_create_duplicate:
     "That package was not created — you already have a default package. Uncheck \u201cmake this my default\u201d and try again.",
+  package_invalid:
+    "That package was not saved. Give it a name and a LinkedIn URL, and keep the cover letter under 4,000 characters.",
+
+  // lib/actions/messages.ts
+  message_invalid:
+    "That message was not sent. Write something first, and keep it under 4,000 characters.",
 
   // lib/actions/profile.ts
   profile_save_failed:
@@ -63,6 +91,8 @@ const MESSAGES = {
   profile_section_missing: "That section no longer exists.",
   profile_photo_attach_failed:
     "The photo uploaded but could not be attached to your profile. Sign out and back in, then try again.",
+  profile_photo_invalid:
+    "That photo was not saved. Use a JPEG, PNG, or WebP under 2MB.",
   resume_book_opt_in_failed:
     "Your resume book opt-in was not saved. You are still opted out.",
   profile_invalid:

@@ -27,12 +27,10 @@ type Kind = (typeof KINDS)[number]["id"];
 export default function InviteForm({
   companies,
   initialKind = "member",
-  error,
   sent,
 }: {
   companies: { id: string; name: string }[];
   initialKind?: Kind;
-  error?: string;
   sent?: boolean;
 }) {
   const [kind, setKind] = useState<Kind>(
@@ -69,7 +67,6 @@ export default function InviteForm({
           Invite email sent. They’ll set a password from the link.
         </p>
       )}
-      {error && <p className="text-sm text-red-300">{error}</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Full name">

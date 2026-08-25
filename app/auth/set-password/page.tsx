@@ -4,6 +4,7 @@ import AwaitInviteSession from "@/components/AwaitInviteSession";
 import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { setPassword } from "@/lib/actions/auth";
 import { userNeedsPassword } from "@/lib/auth-session";
+import { DENIAL_MESSAGES } from "@/lib/denials";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SetPasswordPage({
@@ -30,6 +31,7 @@ export default async function SetPasswordPage({
   }
 
   const { error } = await searchParams;
+  const errorText = error ? DENIAL_MESSAGES[error] : undefined;
   const invited = userNeedsPassword(user);
 
   return (
@@ -47,7 +49,7 @@ export default async function SetPasswordPage({
         You&apos;re almost in. Choose a password to finish setting up your QUANTT Hub account.
       </p>
       <form action={setPassword} className="mt-10 w-full max-w-sm space-y-4">
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {errorText && <p className="text-sm text-red-300">{errorText}</p>}
         {!invited && (
           <p className="text-sm text-white/60">
             Use this form to choose the password you&apos;ll log in with.
