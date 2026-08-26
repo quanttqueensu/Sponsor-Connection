@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import HubNav from "@/components/HubNav";
 import { getCurrentProfile } from "@/lib/auth";
+import { graceIsOpen, loadMyCompanyTier } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/time";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function CompanyLayout({ children }: { children: ReactNode }) {
   const profile = await getCurrentProfile();
@@ -17,6 +20,8 @@ export default async function CompanyLayout({ children }: { children: ReactNode 
     .maybeSingle();
 
   let unread = 0;
+  let graceUntil: string | null = null;
+  let assignedName: string | null = null;
   if (cu) {
     // Only the single newest message per conversation, ordered explicitly, so
     // the cost tracks conversations rather than total message volume.
@@ -31,11 +36,27 @@ export default async function CompanyLayout({ children }: { children: ReactNode 
       if (!last) return false;
       return !c.company_last_read_at || last > c.company_last_read_at;
     }).length;
+
+    const { assigned, graceUntil: until } = await loadMyCompanyTier(cu.company_id);
+    graceUntil = until ?? null;
+    assignedName = assigned?.name ?? null;
   }
+
+  const showGrace = graceIsOpen(graceUntil);
 
   return (
     <>
       <HubNav profile={profile} unread={unread} />
+      {showGrace && graceUntil && (
+        <div className="border-b border-blue-light/30 bg-blue-light/10 px-5 py-3 text-center text-xs text-white/80">
+          Your access is grandfathered until {formatDate(`${graceUntil}T12:00:00`)}. From then, your{" "}
+          {assignedName ?? "assigned"} package applies.{" "}
+          <Link href="/company/sponsorship" className="underline">
+            See what changes
+          </Link>
+          .
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-5 py-10">{children}</div>
     </>
   );

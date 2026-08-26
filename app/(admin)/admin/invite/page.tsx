@@ -3,6 +3,7 @@ import InviteForm from "@/components/InviteForm";
 import ManualInviteBanner from "@/components/ManualInviteBanner";
 import Notice from "@/components/Notice";
 import { readManualInvite } from "@/lib/actions/admin";
+import { loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/lib/types";
 
@@ -14,13 +15,14 @@ export default async function InvitePage({
   const { sent, denied, manual, kind } = await searchParams;
   const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
-  const [{ data: companies }, { data: pending }] = await Promise.all([
+  const [{ data: companies }, { data: pending }, tiers] = await Promise.all([
     supabase.from("companies").select("id, name").eq("status", "active").order("name"),
     supabase
       .from("invites")
       .select("email, full_name, role, is_admin, created_at, companies(name)")
       .is("accepted_at", null)
       .order("created_at", { ascending: false }),
+    loadTiers(),
   ]);
 
   const initialKind =
@@ -36,6 +38,7 @@ export default async function InvitePage({
       <Notice message={denied} />
       <InviteForm
         companies={(companies as Pick<Company, "id" | "name">[] | null) ?? []}
+        tiers={tiers.map((t) => ({ id: t.id, name: t.name }))}
         initialKind={initialKind}
         sent={Boolean(sent)}
       />

@@ -1,6 +1,7 @@
 import Link from "next/link";
+import TierBadge from "@/components/TierBadge";
 import type { Post } from "@/lib/types";
-import { isInAppJob, isPlatformJob, kindLabel, roleTypeLabel, termLabel } from "@/lib/types";
+import { isInAppJob, isPlatformJob, kindLabel, one, roleTypeLabel, termLabel } from "@/lib/types";
 import { formatDate } from "@/lib/time";
 
 export default function PostCard({ post }: { post: Post }) {
@@ -14,9 +15,7 @@ export default function PostCard({ post }: { post: Post }) {
     >
       <div className="flex items-baseline gap-3">
         <span className="font-heading text-xs text-blue-light">{kindLabel(post.kind)}</span>
-        {company?.is_sponsor && (
-          <span className="text-[10px] uppercase tracking-wider text-blue-light">Sponsor</span>
-        )}
+        <TierBadge tier={one(company?.sponsor_tiers)} />
         {closed && (
           <span className="text-[10px] uppercase tracking-wider text-white/40">Closed</span>
         )}

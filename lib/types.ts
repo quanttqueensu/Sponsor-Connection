@@ -11,6 +11,9 @@
  *     only (no new columns)
  *   supabase/migrations/0006_snapshot_path_and_photo_writes.sql — tighter
  *     applications_guard() snapshot prefix; photos write policies (no new columns)
+ *   supabase/migrations/0007_sponsor_tiers.sql — sponsor_* tables
+ *   supabase/migrations/0008_company_tiers.sql — companies.sponsor_tier_id, grace
+ *   supabase/migrations/0009_tier_policies.sql — capability-gated RLS (no new columns)
  *
  * If you add, rename, retype, or change the nullability of a column in a
  * migration, update the matching type in this file in the same commit.
@@ -32,6 +35,36 @@ export type ApplicationStage =
 export type PostStatus = "open" | "closed";
 export type CompanyStatus = "active" | "inactive";
 export type JoinRequestStatus = "pending" | "approved" | "rejected";
+
+export type SponsorCapabilityKind = "boolean" | "quota";
+
+export type SponsorTier = {
+  id: string;
+  key: string;
+  name: string;
+  rank: number;
+  price_cents: number | null;
+  blurb: string;
+  applicant_embargo_hours: number;
+  is_active: boolean;
+  is_system: boolean;
+  created_at: string;
+};
+
+export type SponsorCapability = {
+  key: string;
+  label: string;
+  description: string;
+  kind: SponsorCapabilityKind;
+  is_enforced: boolean;
+  sort_order: number;
+};
+
+export type SponsorTierCapability = {
+  tier_id: string;
+  capability: string;
+  value: number | null;
+};
 
 export type Profile = {
   id: string;
@@ -78,12 +111,15 @@ export type Company = {
   id: string;
   name: string;
   slug: string;
-  is_sponsor: boolean;
+  sponsor_tier_id: string;
+  grace_tier_id: string | null;
+  tier_grace_until: string | null;
   logo_url: string | null;
   website: string | null;
   description: string | null;
   status: CompanyStatus;
   created_at: string;
+  sponsor_tiers?: SponsorTier | null;
 };
 
 export type CompanyUser = {

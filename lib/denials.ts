@@ -30,6 +30,10 @@ const MESSAGES = {
     "That comment was not posted. Write something first, and keep it under 4,000 characters.",
   post_invalid:
     "That post was not published. Give it a title and a body, and keep them to a reasonable length.",
+  post_kind_forbidden:
+    "Your current sponsorship does not include that kind of posting. Choose another type, or ask a QUANTT exec.",
+  post_quota_reached:
+    "You already have the maximum number of open in-app jobs for your tier. Close one first, or ask a QUANTT exec about upgrading.",
 
   // lib/actions/applications.ts
   application_duplicate: "You've already applied to that job.",
@@ -67,10 +71,29 @@ const MESSAGES = {
   invite_name_email_required: "Name and email are required.",
   invite_company_required: "Choose an existing firm or enter a new company name.",
   invite_kind_invalid: "Choose member, admin, or company.",
+  invite_tier_required: "Choose a sponsorship tier for this firm.",
   join_request_failed:
     "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.",
-  sponsor_toggle_failed:
-    "That firm's sponsor status was not changed. The firm may have been removed, or your account may no longer have admin rights.",
+  company_tier_assign_failed:
+    "That firm's tier could not be changed. The firm may have been removed, or your account may no longer have admin rights.",
+  admins_only: "You need exec access to do that.",
+
+  // lib/actions/tiers.ts
+  tier_name_required: "A tier needs a name.",
+  tier_rank_invalid:
+    "Rank must be a whole number of 1 or more. Rank 0 is reserved for firms with no sponsorship.",
+  tier_rank_taken: "Another active tier already uses that rank. Pick a different number.",
+  tier_key_duplicate: "A tier with that name already exists. Choose a different name.",
+  tier_price_invalid: "Price must be a number, or left blank.",
+  tier_embargo_invalid: "Applicant delay must be a whole number of hours between 0 and 8760.",
+  tier_save_failed:
+    "That tier could not be saved. It may have been removed, or your account may no longer have admin rights.",
+  tier_deactivate_system: "That system tier cannot be deactivated.",
+  tier_confirm_required:
+    "That change removes capability from firms already on this tier. Check the confirmation box and try again.",
+  tier_capability_invalid: "That is not a capability this platform enforces.",
+  tier_capability_value_invalid:
+    "That value isn't a valid whole number. Leave it blank for unlimited, or enter a whole number of slots.",
 
   // lib/actions/packages.ts
   package_default_missing:

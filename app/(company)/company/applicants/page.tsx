@@ -1,6 +1,8 @@
+import LockedCard from "@/components/LockedCard";
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { getCurrentProfile } from "@/lib/auth";
+import { can, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { Application } from "@/lib/types";
 import Link from "next/link";
@@ -21,6 +23,12 @@ export default async function ApplicantsPage({
     .eq("profile_id", profile.id)
     .maybeSingle();
   if (!cu) redirect("/company");
+
+  const [{ assigned, effective }, tiers] = await Promise.all([
+    loadMyCompanyTier(cu.company_id),
+    loadTiers(),
+  ]);
+
   const { data: apps } = await supabase
     .from("applications")
     .select("*, posts(title), profiles(full_name)")
@@ -28,25 +36,47 @@ export default async function ApplicantsPage({
     .eq("company_id", cu.company_id)
     .order("created_at", { ascending: false });
 
+  const embargo = effective?.applicant_embargo_hours ?? 0;
+
   return (
     <>
       <PageHeader kicker="Hiring" title="Applicants" />
       <Notice message={sp.denied} />
-      <ul>
-        {(apps as Application[] | null)?.map((a) => (
-          <li key={a.id} className="border-t border-white/10 py-4">
-            <p className="text-white">{a.profiles?.full_name}</p>
-            <p className="text-sm text-white/60">
-              {a.posts?.title} · {a.stage}
-            </p>
-            {a.post_id && (
-              <Link href={`/company/posts/${a.post_id}`} className="text-xs text-blue-light">
-                Open posting
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
+      <LockedCard
+        capability="read_applicants"
+        tier={effective}
+        tiers={tiers}
+        title="Applicant pipeline"
+        description="Your current sponsorship does not include seeing who applied in the hub."
+      >
+        {embargo > 0 && (
+          <p className="mb-6 text-sm text-white/60">
+            New applications appear after {embargo} hours at your tier.
+          </p>
+        )}
+        {assigned && !can(assigned, "read_applicants") && can(effective, "read_applicants") && (
+          <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
+            This pipeline is still open during grandfathering. It will lock when your{" "}
+            {assigned.name} package takes effect.
+          </p>
+        )}
+        <ul>
+          {(apps as Application[] | null)?.map((a) => (
+            <li key={a.id} className="border-t border-white/10 py-4">
+              <p className="text-white">{a.profiles?.full_name}</p>
+              <p className="text-sm text-white/60">
+                {a.posts?.title} · {a.stage}
+              </p>
+              {a.post_id && (
+                <Link href={`/company/posts/${a.post_id}`} className="text-xs text-blue-light">
+                  Open posting
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!(apps ?? []).length && <p className="text-sm text-white/60">No applicants yet.</p>}
+      </LockedCard>
     </>
   );
 }

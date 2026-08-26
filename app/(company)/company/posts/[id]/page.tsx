@@ -1,6 +1,9 @@
 import { startConversation } from "@/lib/actions/messages";
 import { updateApplicationStage } from "@/lib/actions/applications";
+import LockedAction from "@/components/LockedAction";
+import LockedCard from "@/components/LockedCard";
 import { getCurrentProfile } from "@/lib/auth";
+import { loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformJob, kindLabel, type Application, type Post } from "@/lib/types";
 import { notFound, redirect } from "next/navigation";
@@ -22,8 +25,13 @@ export default async function CompanyPostPage({
     .eq("profile_id", profile.id)
     .maybeSingle();
   const { data: post } = await supabase.from("posts").select("*").eq("id", id).maybeSingle();
-  if (!post || post.company_id !== cu?.company_id) notFound();
+  if (!cu || !post || post.company_id !== cu.company_id) notFound();
   const p = post as Post;
+
+  const [{ effective }, tiers] = await Promise.all([
+    loadMyCompanyTier(cu.company_id),
+    loadTiers(),
+  ]);
 
   const { data: apps } = isPlatformJob(p)
     ? await supabase
@@ -40,46 +48,60 @@ export default async function CompanyPostPage({
       <p className="mt-4 whitespace-pre-wrap text-sm text-white/70">{p.body}</p>
       {isPlatformJob(p) && (
         <section className="mt-10">
-          <h2 className="font-heading text-lg font-bold text-white">Applicants</h2>
-          <ul className="mt-4 space-y-4">
-            {(apps as Application[] | null)?.map((a) => (
-              <li key={a.id} className="border-t border-white/10 py-4">
-                <p className="text-white">{a.profiles?.full_name}</p>
-                <p className="text-sm text-white/50">
-                  {a.package_name} · {a.linkedin_url}
-                </p>
-                {a.cover_letter && (
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-white/60">{a.cover_letter}</p>
-                )}
-                <ResumeLink applicationId={a.id} path={a.resume_path} doc="resume" />
-                <ResumeLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
-                <div className="mt-2 flex gap-3">
-                  <form action={updateApplicationStage}>
-                    <input type="hidden" name="id" value={a.id} />
-                    <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
-                      {stages.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="ml-2 text-xs uppercase tracking-wider text-blue-light">
-                      Save
-                    </button>
-                  </form>
-                  {a.member_id && p.company_id && (
-                    <form action={startConversation}>
-                      <input type="hidden" name="company_id" value={p.company_id} />
-                      <input type="hidden" name="member_id" value={a.member_id} />
-                      <button className="text-xs uppercase tracking-wider text-white/50">
-                        Message
+          <LockedCard
+            capability="read_applicants"
+            tier={effective}
+            tiers={tiers}
+            title="Applicants"
+            description="Your current sponsorship does not include seeing who applied to this posting."
+          >
+            <h2 className="font-heading text-lg font-bold text-white">Applicants</h2>
+            <ul className="mt-4 space-y-4">
+              {(apps as Application[] | null)?.map((a) => (
+                <li key={a.id} className="border-t border-white/10 py-4">
+                  <p className="text-white">{a.profiles?.full_name}</p>
+                  <p className="text-sm text-white/50">
+                    {a.package_name} · {a.linkedin_url}
+                  </p>
+                  {a.cover_letter && (
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-white/60">{a.cover_letter}</p>
+                  )}
+                  <ResumeLink applicationId={a.id} path={a.resume_path} doc="resume" />
+                  <ResumeLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
+                  <div className="mt-2 flex gap-3">
+                    <form action={updateApplicationStage}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
+                        {stages.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="ml-2 text-xs uppercase tracking-wider text-blue-light">
+                        Save
                       </button>
                     </form>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                    {a.member_id && p.company_id && (
+                      <LockedAction
+                        capability="dm_initiate_applicant"
+                        tier={effective}
+                        tiers={tiers}
+                      >
+                        <form action={startConversation}>
+                          <input type="hidden" name="company_id" value={p.company_id} />
+                          <input type="hidden" name="member_id" value={a.member_id} />
+                          <button className="text-xs uppercase tracking-wider text-white/50">
+                            Message
+                          </button>
+                        </form>
+                      </LockedAction>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </LockedCard>
         </section>
       )}
     </>

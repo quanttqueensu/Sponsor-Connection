@@ -301,12 +301,14 @@ export async function invitePerson(formData: FormData) {
       let companyId = emptyToNull(formData.get("company_id"));
       const newName = String(formData.get("new_company_name") ?? "").trim();
       if (!companyId && newName) {
+        const tierId = emptyToNull(formData.get("sponsor_tier_id"));
+        if (!tierId) denyRedirect("/admin/invite", "invite_tier_required");
         const { data, error } = await admin
           .from("companies")
           .insert({
             name: newName,
             slug: slugify(newName) + "-" + Math.random().toString(36).slice(2, 6),
-            is_sponsor: formData.get("is_sponsor") === "on",
+            sponsor_tier_id: tierId,
             status: "active",
           })
           .select("id")
@@ -377,7 +379,7 @@ export async function invitePerson(formData: FormData) {
 
 export async function reviewJoinRequest(formData: FormData) {
   const profile = await requireProfile();
-  if (!profile.is_admin) throw new Error("Admins only");
+  if (!profile.is_admin) denyRedirect("/feed", "admins_only");
   const id = String(formData.get("id"));
   const decision = String(formData.get("decision"));
   const supabase = await createClient();
@@ -412,12 +414,14 @@ export async function reviewJoinRequest(formData: FormData) {
   if (req.status !== "pending") throw new Error("Request already reviewed");
 
   const admin = createAdminClient();
+  const tierId = emptyToNull(formData.get("sponsor_tier_id"));
+  if (!tierId) denyRedirect("/admin/requests", "invite_tier_required");
   const { data: company, error: cErr } = await admin
     .from("companies")
     .insert({
       name: req.company_name,
       slug: slugify(req.company_name) + "-" + crypto.randomUUID().slice(0, 4),
-      is_sponsor: formData.get("is_sponsor") === "on",
+      sponsor_tier_id: tierId,
       website: req.website,
       status: "active",
     })
@@ -490,20 +494,34 @@ export async function reviewJoinRequest(formData: FormData) {
   }
 }
 
-export async function toggleSponsor(formData: FormData) {
+export async function setCompanyTier(formData: FormData) {
   const profile = await requireProfile();
-  if (!profile.is_admin) throw new Error("Admins only");
+  if (!profile.is_admin) denyRedirect("/feed", "admins_only");
   const supabase = await createClient();
+  const companyId = String(formData.get("company_id"));
+  const tierId = String(formData.get("sponsor_tier_id"));
+  const { data: before } = await supabase
+    .from("companies")
+    .select("sponsor_tier_id")
+    .eq("id", companyId)
+    .maybeSingle();
   const { data, error } = await supabase
     .from("companies")
-    .update({ is_sponsor: formData.get("is_sponsor") === "true" })
-    .eq("id", String(formData.get("id")))
+    .update({ sponsor_tier_id: tierId })
+    .eq("id", companyId)
     .select("id");
-  if (error) throw new Error(error.message);
-  if (!data?.length) {
-    denyRedirect("/admin/companies", "sponsor_toggle_failed");
-  }
+  if (error || !data?.length) denyRedirect("/admin/companies", "company_tier_assign_failed");
+  await supabase.from("sponsor_tier_events").insert({
+    kind: "company_assigned",
+    tier_id: tierId,
+    company_id: companyId,
+    actor_id: profile.id,
+    detail: { from: before?.sponsor_tier_id ?? null, to: tierId },
+  });
   revalidatePath("/admin/companies");
+  revalidatePath("/admin/tiers");
+  revalidatePath("/feed");
+  revalidatePath("/company");
 }
 
 const MAX_COMPANY_NAME = 200;

@@ -17,6 +17,7 @@ export default async function AdminHome() {
     { href: "/admin/invite", label: "Invite", hint: "Members, execs, and company contacts" },
     { href: "/admin/people", label: "People", hint: `${members ?? 0} members` },
     { href: "/admin/companies", label: "Companies", hint: "Sponsors, firms, and the /join link" },
+    { href: "/admin/tiers", label: "Tiers", hint: "Reprice packages and grant functionality" },
     { href: "/admin/requests", label: "Join requests", hint: `${pending ?? 0} pending` },
     { href: "/admin/applications", label: "Applications", hint: `${apps ?? 0} total` },
     { href: "/admin/posts", label: "Posts", hint: "Review, close, or write a post" },

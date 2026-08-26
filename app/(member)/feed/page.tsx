@@ -43,19 +43,23 @@ export default async function FeedPage({
   const page = Number.isFinite(parsedPage) && parsedPage > 1 ? Math.floor(parsedPage) : 1;
   const from = (page - 1) * PAGE_SIZE;
 
-  // "Sponsor" lives on the joined company row, so push the filter into the
-  // query with an inner join rather than fetching everything and filtering in
-  // JS. An inner join is also the right semantics: a post with no company can
-  // never be a sponsor post.
+  // Sponsor status lives on the joined company's tier, so push the filter into
+  // the query with an inner join rather than fetching everything and filtering
+  // in JS. An inner join is also the right semantics: a post with no company can
+  // never be a sponsor post. Rank 0 is "Not sponsoring".
   let query = supabase
     .from("posts")
-    .select(sponsorOnly ? "*, companies!inner(*)" : "*, companies(*)")
+    .select(
+      sponsorOnly
+        ? "*, companies!inner(*, sponsor_tiers!inner(id, name, rank, key))"
+        : "*, companies(*, sponsor_tiers(id, name, rank, key))",
+    )
     .eq("published", true)
     .order("created_at", { ascending: false })
     // One extra row tells us whether a next page exists without a count query.
     .range(from, from + PAGE_SIZE);
 
-  if (sponsorOnly) query = query.eq("companies.is_sponsor", true);
+  if (sponsorOnly) query = query.gt("companies.sponsor_tiers.rank", 0);
   if (sp.kind) query = query.eq("kind", sp.kind);
   if (sp.role_type) query = query.eq("role_type", sp.role_type);
   if (sp.location) query = query.ilike("location", `%${sp.location}%`);
@@ -70,7 +74,7 @@ export default async function FeedPage({
   const { data: posts } = await query;
   const { data: companies } = await supabase
     .from("companies")
-    .select("id, name, is_sponsor")
+    .select("id, name")
     .eq("status", "active")
     .order("name");
 

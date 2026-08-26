@@ -7,6 +7,7 @@ import {
   isInAppJob,
   isPlatformJob,
   kindLabel,
+  one,
   roleTypeLabel,
   termLabel,
   type HiringPackage,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/types";
 import { Field, PrimaryButton, TextArea } from "@/components/Form";
 import Notice from "@/components/Notice";
+import TierBadge from "@/components/TierBadge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate } from "@/lib/time";
@@ -32,7 +34,7 @@ export default async function PostDetailPage({
   const supabase = await createClient();
   const { data: post } = await supabase
     .from("posts")
-    .select("*, companies(*)")
+    .select("*, companies(*, sponsor_tiers(id, name, rank, key))")
     .eq("id", id)
     .maybeSingle();
   if (!post) notFound();
@@ -68,9 +70,9 @@ export default async function PostDetailPage({
 
   return (
     <article>
-      <p className="text-[11px] uppercase tracking-[2px] text-blue-light">
+      <p className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[2px] text-blue-light">
         {kindLabel(p.kind)}
-        {p.companies?.is_sponsor ? " · Sponsor" : ""}
+        <TierBadge tier={one(p.companies?.sponsor_tiers)} />
       </p>
       <Notice message={sp.denied} />
       <h1 className="mt-2 font-heading text-3xl font-bold text-white">{p.title}</h1>

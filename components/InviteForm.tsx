@@ -26,16 +26,19 @@ type Kind = (typeof KINDS)[number]["id"];
 
 export default function InviteForm({
   companies,
+  tiers,
   initialKind = "member",
   sent,
 }: {
   companies: { id: string; name: string }[];
+  tiers: { id: string; name: string }[];
   initialKind?: Kind;
   sent?: boolean;
 }) {
   const [kind, setKind] = useState<Kind>(
     KINDS.some((k) => k.id === initialKind) ? initialKind : "member",
   );
+  const [existingId, setExistingId] = useState("");
 
   return (
     <form action={invitePerson} className="space-y-6">
@@ -81,7 +84,12 @@ export default function InviteForm({
         <div className="space-y-4 border border-white/10 p-4">
           <p className="text-sm text-white/55">Which firm are they joining?</p>
           <Field label="Existing company">
-            <select name="company_id" className="w-full rounded px-3 py-2 text-sm">
+            <select
+              name="company_id"
+              value={existingId}
+              onChange={(e) => setExistingId(e.target.value)}
+              className="w-full rounded px-3 py-2 text-sm"
+            >
               <option value="">Create a new company below</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -90,13 +98,23 @@ export default function InviteForm({
               ))}
             </select>
           </Field>
-          <Field label="Or new company name">
-            <TextInput name="new_company_name" />
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-white/70">
-            <input type="checkbox" name="is_sponsor" />
-            Mark as a QUANTT sponsor
-          </label>
+          {!existingId && (
+            <>
+              <Field label="New company name">
+                <TextInput name="new_company_name" required />
+              </Field>
+              <Field label="Sponsorship package">
+                <select name="sponsor_tier_id" required className="w-full rounded px-3 py-2 text-sm">
+                  <option value="">Choose a package</option>
+                  {tiers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </>
+          )}
         </div>
       )}
 

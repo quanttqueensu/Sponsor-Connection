@@ -20,6 +20,7 @@ export default function HubNav({ profile, unread = 0 }: Props) {
         { href: "/company", label: "Posts" },
         { href: "/company/applicants", label: "Applicants" },
         { href: "/company/messages", label: "Messages" },
+        { href: "/company/sponsorship", label: "Sponsorship" },
       ]
     : [
         { href: "/feed", label: "Feed" },

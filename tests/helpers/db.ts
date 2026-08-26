@@ -55,9 +55,18 @@ export async function seedMember(
 
 export async function seedCompany(
   name: string,
-  opts: { isSponsor?: boolean } = {},
+  opts: { isSponsor?: boolean; tierKey?: string } = {},
 ): Promise<string> {
   const svc = asService();
+  const key = opts.tierKey ?? (opts.isSponsor ? "partner" : "none");
+  const { data: tier, error: tierErr } = await svc
+    .from("sponsor_tiers")
+    .select("id")
+    .eq("key", key)
+    .single();
+  if (tierErr || !tier) {
+    throw new Error(`seedCompany ${name}: missing tier ${key}`);
+  }
   const { data, error } = await svc
     .from("companies")
     .insert({
@@ -66,7 +75,7 @@ export async function seedCompany(
         name.toLowerCase().replace(/\s+/g, "-") +
         "-" +
         Math.random().toString(36).slice(2, 6),
-      is_sponsor: opts.isSponsor ?? false,
+      sponsor_tier_id: tier.id,
       status: "active",
     })
     .select("id")

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { can, loadMyCompanyTier } from "@/lib/tiers";
 import type { PostKind } from "@/lib/types";
 import { denyRedirect } from "./deny";
 
@@ -81,7 +82,19 @@ export async function createPost(formData: FormData) {
     term_year: isInApp ? termYear : null,
     external_url: kind === "job_link" || kind === "job" ? externalUrl : null,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (profile.role === "company_user" && companyId) {
+      if (kind === "event") denyRedirect(postFormPath, "post_kind_forbidden");
+      if (isInApp) {
+        const { effective } = await loadMyCompanyTier(companyId);
+        if (!can(effective, "post_in_app_job")) {
+          denyRedirect(postFormPath, "post_kind_forbidden");
+        }
+        denyRedirect(postFormPath, "post_quota_reached");
+      }
+    }
+    throw new Error(error.message);
+  }
   revalidatePath("/feed");
   revalidatePath("/company");
   revalidatePath("/admin");
@@ -117,17 +130,11 @@ export async function closePost(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
 
-  const { data, error } = await supabase
-    .from("posts")
-    .update({ status: "closed" })
-    .eq("id", id)
-    .select("id");
-
+  // Company UPDATE on posts is capability-gated and would refuse a close after
+  // a downgrade. close_own_post is the supported path for firms and admins.
+  const { data, error } = await supabase.rpc("close_own_post", { p_post: id });
   if (error) throw new Error(error.message);
-  if (!data?.length) {
-    // posts_admin_write is `for all`, so an admin matching zero rows means the
-    // post is gone — never that it belongs to someone else. Only the company
-    // policy is firm-scoped, and a plain member cannot close anything.
+  if (!data) {
     if (profile.role === "company_user") {
       denyRedirect("/company", "post_close_not_yours");
     }
@@ -138,6 +145,7 @@ export async function closePost(formData: FormData) {
   }
 
   revalidatePath("/company");
+  revalidatePath("/admin/posts");
   revalidatePath("/feed");
 }
 

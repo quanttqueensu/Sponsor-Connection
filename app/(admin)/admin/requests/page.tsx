@@ -2,6 +2,7 @@ import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import ManualInviteBanner from "@/components/ManualInviteBanner";
 import { readManualInvite, reviewJoinRequest } from "@/lib/actions/admin";
+import { loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { JoinRequest } from "@/lib/types";
 
@@ -13,11 +14,10 @@ export default async function RequestsPage({
   const { manual, denied } = await searchParams;
   const setup = manual ? await readManualInvite() : null;
   const supabase = await createClient();
-  const { data: requests } = await supabase
-    .from("company_join_requests")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at");
+  const [{ data: requests }, tiers] = await Promise.all([
+    supabase.from("company_join_requests").select("*").eq("status", "pending").order("created_at"),
+    loadTiers(),
+  ]);
 
   return (
     <>
@@ -32,13 +32,24 @@ export default async function RequestsPage({
               {r.contact_name} · {r.contact_email}
             </p>
             {r.note && <p className="mt-2 text-sm text-white/60">{r.note}</p>}
-            <div className="mt-3 flex gap-3">
-              <form action={reviewJoinRequest}>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <form action={reviewJoinRequest} className="flex flex-wrap items-center gap-3">
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="decision" value="approved" />
-                <label className="mr-3 text-xs text-white/50">
-                  <input type="checkbox" name="is_sponsor" /> Sponsor
-                </label>
+                <select
+                  name="sponsor_tier_id"
+                  required
+                  aria-label={`Package for ${r.company_name}`}
+                  className="rounded px-3 py-2 text-sm"
+                  defaultValue=""
+                >
+                  <option value="">Choose a package</option>
+                  {tiers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
                 <button className="text-xs uppercase tracking-wider text-blue-light">Approve</button>
               </form>
               <form action={reviewJoinRequest}>
