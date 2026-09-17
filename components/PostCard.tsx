@@ -8,12 +8,17 @@ export default function PostCard({ post }: { post: Post }) {
   const company = post.companies;
   const job = isInAppJob(post);
   const closed = isPlatformJob(post) && post.status === "closed";
+  const logo = company?.logo_url;
   return (
     <Link
       href={`/feed/${post.id}`}
       className="block border-t border-white/10 py-6 transition-colors hover:border-white/20"
     >
       <div className="flex items-baseline gap-3">
+        {logo && /^https?:\/\//i.test(logo) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt="" className="h-6 w-6 object-contain" />
+        ) : null}
         <span className="font-heading text-xs text-blue-light">{kindLabel(post.kind)}</span>
         <TierBadge tier={one(company?.sponsor_tiers)} />
         {closed && (

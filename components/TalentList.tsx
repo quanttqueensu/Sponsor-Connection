@@ -1,0 +1,117 @@
+import { startConversation } from "@/lib/actions/messages";
+import LockedAction from "@/components/LockedAction";
+import type { CapabilityKey, TierWithCaps } from "@/lib/tiers";
+import { can } from "@/lib/tiers";
+import Link from "next/link";
+
+export type TalentRow = {
+  id: string;
+  full_name: string;
+  program: string | null;
+  grad_year: number | null;
+  bio: string | null;
+  interests: string | null;
+  linkedin_url: string | null;
+  github_url: string | null;
+  website_url: string | null;
+  photo_path: string | null;
+  package_name: string | null;
+};
+
+export default function TalentList({
+  members,
+  companyId,
+  returnTo,
+  dmTier,
+  tiers,
+  empty,
+}: {
+  members: TalentRow[];
+  companyId: string;
+  returnTo: string;
+  dmTier: TierWithCaps | null;
+  tiers: TierWithCaps[];
+  empty: string;
+}) {
+  const canMessage = can(dmTier, "dm_initiate_any");
+  if (!members.length) {
+    return <p className="text-sm text-white/60">{empty}</p>;
+  }
+  return (
+    <ul>
+      {members.map((m) => (
+        <li key={m.id} className="border-t border-white/10 py-5">
+          <div className="flex gap-4">
+            {m.photo_path ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/company/talent/${m.id}/photo`}
+                alt=""
+                width={56}
+                height={56}
+                className="h-14 w-14 shrink-0 bg-white/5 object-cover"
+              />
+            ) : (
+              <div className="h-14 w-14 shrink-0 bg-white/5" aria-hidden />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="font-heading text-lg font-bold text-white">{m.full_name}</p>
+              <p className="mt-1 text-sm text-white/50">
+                {[m.program, m.grad_year, m.package_name].filter(Boolean).join(" · ")}
+              </p>
+              {m.bio && <p className="mt-2 line-clamp-3 text-sm text-white/70">{m.bio}</p>}
+              {m.interests && (
+                <p className="mt-1 text-xs text-white/45">Interests: {m.interests}</p>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                <a
+                  href={`/company/talent/${m.id}/resume`}
+                  className="text-xs uppercase tracking-wider text-blue-light"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Resume
+                </a>
+                <ExtLink href={m.linkedin_url} label="LinkedIn" />
+                <ExtLink href={m.github_url} label="GitHub" />
+                <ExtLink href={m.website_url} label="Website" />
+                {canMessage ? (
+                  <form action={startConversation}>
+                    <input type="hidden" name="company_id" value={companyId} />
+                    <input type="hidden" name="member_id" value={m.id} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button className="text-xs uppercase tracking-wider text-white/50 hover:text-white">
+                      Message
+                    </button>
+                  </form>
+                ) : (
+                  <LockedAction
+                    capability={"dm_initiate_any" as CapabilityKey}
+                    tier={dmTier}
+                    tiers={tiers}
+                  >
+                    Message
+                  </LockedAction>
+                )}
+              </div>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ExtLink({ href, label }: { href: string | null; label: string }) {
+  if (!href || !/^https?:\/\//i.test(href)) return null;
+  return (
+    <Link
+      href={href}
+      className="text-xs uppercase tracking-wider text-white/50 hover:text-white"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {label}
+    </Link>
+  );
+}

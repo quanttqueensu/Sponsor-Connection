@@ -183,6 +183,8 @@ export async function setResumeBookOptIn(formData: FormData) {
     );
   }
   revalidatePath("/profile");
+  revalidatePath("/company/resume-book");
+  revalidatePath("/company/search");
 }
 
 /** Input caps. Nothing in the schema bounds these text columns. */

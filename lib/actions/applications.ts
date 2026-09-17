@@ -161,6 +161,12 @@ export async function applyToJob(formData: FormData) {
     if (error.code === "23505") {
       denyRedirect("/applications", "application_duplicate");
     }
+    if (/this firm is not accepting hub applications/i.test(error.message)) {
+      denyRedirect(
+        `/feed/${encodeURIComponent(postId)}`,
+        "application_firm_not_accepting",
+      );
+    }
     throw new Error(error.message);
   }
   await notify({

@@ -1,5 +1,8 @@
+import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import TierBadge from "@/components/TierBadge";
+import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
+import { updateCompanyProfile } from "@/lib/actions/company";
 import { getCurrentProfile } from "@/lib/auth";
 import {
   can,
@@ -16,7 +19,12 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/time";
 import { redirect } from "next/navigation";
 
-export default async function SponsorshipPage() {
+export default async function SponsorshipPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const sp = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
@@ -27,11 +35,17 @@ export default async function SponsorshipPage() {
     .maybeSingle();
   if (!cu) redirect("/company");
 
-  const [{ assigned, effective, graceUntil }, capabilities, tiers] = await Promise.all([
-    loadMyCompanyTier(cu.company_id),
-    loadCapabilities(),
-    loadTiers(),
-  ]);
+  const [{ assigned, effective, graceUntil }, capabilities, tiers, { data: company }] =
+    await Promise.all([
+      loadMyCompanyTier(cu.company_id),
+      loadCapabilities(),
+      loadTiers(),
+      supabase
+        .from("companies")
+        .select("website, logo_url, description")
+        .eq("id", cu.company_id)
+        .maybeSingle(),
+    ]);
 
   const display = assigned ?? effective;
   const grace = graceIsOpen(graceUntil);
@@ -41,6 +55,7 @@ export default async function SponsorshipPage() {
       <PageHeader kicker="Package" title="Sponsorship">
         What your firm bought, and what this hub actually unlocks.
       </PageHeader>
+      <Notice message={sp.denied} />
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-heading text-2xl font-bold text-white">{display?.name ?? "Unassigned"}</h2>
         <TierBadge tier={display} />
@@ -89,6 +104,46 @@ export default async function SponsorshipPage() {
           New applications appear {display.applicant_embargo_hours} hours after they are submitted.
         </p>
       )}
+      {display && display.resume_book_embargo_hours > 0 && can(display, "resume_book") && (
+        <p className="mt-3 text-sm text-white/60">
+          New resume-book opt-ins appear {display.resume_book_embargo_hours} hours after a member
+          opts in.
+        </p>
+      )}
+
+      <section className="mt-12 border-t border-white/10 pt-8">
+        <h2 className="font-heading text-lg font-bold text-white">Firm profile</h2>
+        <p className="mt-1 text-sm text-white/60">
+          Your logo appears next to posts on the member feed.
+        </p>
+        <form action={updateCompanyProfile} className="mt-4 grid max-w-xl gap-4">
+          <Field label="Website">
+            <TextInput
+              name="website"
+              defaultValue={company?.website ?? ""}
+              maxLength={500}
+              placeholder="https://"
+            />
+          </Field>
+          <Field label="Logo URL">
+            <TextInput
+              name="logo_url"
+              defaultValue={company?.logo_url ?? ""}
+              maxLength={500}
+              placeholder="https://"
+            />
+          </Field>
+          <Field label="Description">
+            <TextArea
+              name="description"
+              rows={3}
+              defaultValue={company?.description ?? ""}
+              maxLength={500}
+            />
+          </Field>
+          <PrimaryButton type="submit">Save profile</PrimaryButton>
+        </form>
+      </section>
     </>
   );
 }

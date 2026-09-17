@@ -51,15 +51,16 @@ export default async function FeedPage({
     .from("posts")
     .select(
       sponsorOnly
-        ? "*, companies!inner(*, sponsor_tiers!inner(id, name, rank, key))"
-        : "*, companies(*, sponsor_tiers(id, name, rank, key))",
+        ? "*, companies!inner(*, sponsor_tiers!sponsor_tier_id!inner(id, name, rank, key))"
+        : "*, companies(*, sponsor_tiers!sponsor_tier_id(id, name, rank, key))",
     )
     .eq("published", true)
+    .eq("status", "open")
     .order("created_at", { ascending: false })
     // One extra row tells us whether a next page exists without a count query.
     .range(from, from + PAGE_SIZE);
 
-  if (sponsorOnly) query = query.gt("companies.sponsor_tiers.rank", 0);
+  if (sponsorOnly) query = query.gt("companies.sponsor_tiers!sponsor_tier_id.rank", 0);
   if (sp.kind) query = query.eq("kind", sp.kind);
   if (sp.role_type) query = query.eq("role_type", sp.role_type);
   if (sp.location) query = query.ilike("location", `%${sp.location}%`);
@@ -71,7 +72,10 @@ export default async function FeedPage({
     }
   }
 
-  const { data: posts } = await query;
+  const { data: posts, error: postsError } = await query;
+  if (postsError) {
+    console.error("feed: posts query failed", postsError.message, postsError.code);
+  }
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
@@ -83,6 +87,17 @@ export default async function FeedPage({
   const list = hasNext ? fetched.slice(0, PAGE_SIZE) : fetched;
 
   const kinds: PostKind[] = ["job", "job_link", "event", "announcement", "connection"];
+  const now = new Date();
+  const termOptions: { value: string; label: string }[] = [];
+  for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 2; y++) {
+    for (const [season, label] of [
+      ["fall", "Fall"],
+      ["winter", "Winter"],
+      ["summer", "Summer"],
+    ] as const) {
+      termOptions.push({ value: `${season}-${y}`, label: `${label} ${y}` });
+    }
+  }
   const roles: RoleType[] = ["full_time", "internship", "coop"];
   const hasFilters = Boolean(
     sp.kind || sp.role_type || sp.term || sp.company || sp.location || sp.sponsor,
@@ -134,6 +149,19 @@ export default async function FeedPage({
             </option>
           ))}
         </select>
+        <select
+          name="term"
+          aria-label="Term"
+          defaultValue={sp.term ?? ""}
+          className="rounded px-3 py-2 text-sm"
+        >
+          <option value="">Any term</option>
+          {termOptions.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
         <input
           name="location"
           aria-label="Location"
@@ -141,7 +169,6 @@ export default async function FeedPage({
           placeholder="Location"
           className="rounded px-3 py-2 text-sm"
         />
-        {sp.term && <input type="hidden" name="term" value={sp.term} />}
         <label className="flex items-center gap-2 text-sm text-white/70">
           <input
             type="checkbox"
@@ -168,14 +195,20 @@ export default async function FeedPage({
         )}
       </form>
       <div>
-        {list.length === 0 && (
-          <p className="text-sm text-white/60">
-            {hasFilters ? "No posts match these filters." : "No posts yet."}
-          </p>
+        {postsError ? (
+          <p className="text-sm text-white/60">Posts could not be loaded. Try again.</p>
+        ) : (
+          <>
+            {list.length === 0 && (
+              <p className="text-sm text-white/60">
+                {hasFilters ? "No posts match these filters." : "No posts yet."}
+              </p>
+            )}
+            {list.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </>
         )}
-        {list.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
       </div>
 
       {(page > 1 || hasNext) && (

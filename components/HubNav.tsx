@@ -19,6 +19,8 @@ export default function HubNav({ profile, unread = 0 }: Props) {
     ? [
         { href: "/company", label: "Posts" },
         { href: "/company/applicants", label: "Applicants" },
+        { href: "/company/resume-book", label: "Resume book" },
+        { href: "/company/search", label: "Search" },
         { href: "/company/messages", label: "Messages" },
         { href: "/company/sponsorship", label: "Sponsorship" },
       ]
@@ -54,7 +56,10 @@ export default function HubNav({ profile, unread = 0 }: Props) {
         </Link>
         <div className="flex max-w-[70%] items-center gap-4 overflow-x-auto md:max-w-none">
           {links.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const active =
+              link.href === "/company"
+                ? pathname === "/company" || pathname.startsWith("/company/posts")
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
             const showBadge = link.label === "Messages" && unread > 0;
             return (
               <Link

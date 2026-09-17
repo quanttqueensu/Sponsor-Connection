@@ -9,6 +9,7 @@ import {
   updateProfile,
   uploadPhoto,
 } from "@/lib/actions/profile";
+import { signedPhotoUrl } from "@/lib/photos";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { HiringPackage, ProfileSection } from "@/lib/types";
@@ -36,12 +37,22 @@ export default async function ProfilePage({
     .eq("is_default", true)
     .maybeSingle<Pick<HiringPackage, "id" | "name">>();
 
+  const photoUrl = await signedPhotoUrl(profile.photo_path);
+
   return (
     <>
       <PageHeader kicker="You" title="Profile">
         Visible to other members. Resumes live on hiring packages, not here.
       </PageHeader>
       <Notice message={sp.denied} />
+      {photoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photoUrl}
+          alt=""
+          className="mb-6 h-24 w-24 object-cover"
+        />
+      )}
       <form action={uploadPhoto} encType="multipart/form-data" className="mb-8 flex items-end gap-3">
         <Field label="Photo">
           <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" />
@@ -108,8 +119,8 @@ export default async function ProfilePage({
       <section className="mt-10 border-t border-white/10 pt-8">
         <h2 className="font-heading text-lg font-bold text-white">Resume book</h2>
         <p className="mt-2 text-sm text-white/60">
-          QUANTT sponsors will be able to browse an opt-in resume book. If you opt
-          in, sponsor firms will be able to see your name, program, graduation
+          QUANTT sponsors can browse an opt-in resume book. If you opt
+          in, sponsor firms can see your name, program, graduation
           year, and the resume on your default hiring package. The resume book
           does not include your applications or messages. You can withdraw at
           any time.

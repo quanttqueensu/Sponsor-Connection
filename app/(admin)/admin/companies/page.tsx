@@ -23,7 +23,7 @@ export default async function CompaniesPage({
   const sp = await searchParams;
   const supabase = await createClient();
   const [{ data: companies }, tiers] = await Promise.all([
-    supabase.from("companies").select("*, sponsor_tiers(*)").order("name"),
+    supabase.from("companies").select("*, sponsor_tiers!sponsor_tier_id(*)").order("name"),
     loadTiers({ includeInactive: true }),
   ]);
 

@@ -32,11 +32,14 @@ export default async function PostDetailPage({
   const sp = await searchParams;
   const profile = await getCurrentProfile();
   const supabase = await createClient();
-  const { data: post } = await supabase
+  const { data: post, error: postError } = await supabase
     .from("posts")
-    .select("*, companies(*, sponsor_tiers(id, name, rank, key))")
+    .select("*, companies(*, sponsor_tiers!sponsor_tier_id(id, name, rank, key))")
     .eq("id", id)
     .maybeSingle();
+  if (postError) {
+    console.error("feed/[id]: post query failed", postError.message, postError.code);
+  }
   if (!post) notFound();
 
   const { data: comments } = await supabase
@@ -67,6 +70,18 @@ export default async function PostDetailPage({
   const inApp = isInAppJob(p);
   const closed = p.status === "closed";
   const defaultPkg = (packages ?? []).find((x) => x.is_default) ?? packages?.[0];
+
+  let firmAcceptsHubApps = true;
+  if (inApp && p.company_id) {
+    const { data: canReceive, error: capError } = await supabase.rpc(
+      "company_has_capability",
+      { cid: p.company_id, cap: "read_applicants" },
+    );
+    if (capError) {
+      console.error("feed/[id]: company_has_capability failed", capError.message);
+    }
+    firmAcceptsHubApps = canReceive === true;
+  }
 
   return (
     <article>
@@ -160,6 +175,10 @@ export default async function PostDetailPage({
           <h2 className="font-heading text-lg font-bold text-white">Apply</h2>
           {existingApp ? (
             <p className="mt-3 text-sm text-blue-light">Already applied.</p>
+          ) : !firmAcceptsHubApps ? (
+            <p className="mt-3 text-sm text-white/60">
+              This listing is not taking applications in the hub.
+            </p>
           ) : !packages?.length ? (
             <div className="mt-3">
               <p className="text-sm text-white/60">

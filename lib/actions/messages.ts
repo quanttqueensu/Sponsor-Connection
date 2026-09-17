@@ -37,7 +37,27 @@ export async function startConversation(formData: FormData) {
       .insert({ member_id: memberId, company_id: companyId })
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error || !data) {
+      if (error?.code === "23505") {
+        const { data: raced } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("member_id", memberId)
+          .eq("company_id", companyId)
+          .maybeSingle();
+        if (raced?.id) {
+          redirect(
+            profile.role === "company_user"
+              ? `/company/messages/${raced.id}`
+              : `/messages/${raced.id}`,
+          );
+        }
+      }
+      denyRedirect(
+        companyReturnPath(formData, profile.role),
+        "conversation_start_forbidden",
+      );
+    }
     const path =
       profile.role === "company_user"
         ? `/company/messages/${data.id}`
@@ -118,4 +138,16 @@ export async function markRead(conversationId: string) {
       `markRead: conversation ${conversationId} refused for profile ${profile.id}`,
     );
   }
+}
+
+function companyReturnPath(
+  formData: FormData,
+  role: string,
+) {
+  if (role !== "company_user") return "/feed";
+  const dest = String(formData.get("return_to") ?? "");
+  if (dest.startsWith("/company/") && !dest.includes("//") && !dest.includes("\\")) {
+    return dest;
+  }
+  return "/company/applicants";
 }

@@ -1,4 +1,5 @@
 import { getCurrentProfile } from "@/lib/auth";
+import { signedPhotoUrl } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileSection } from "@/lib/types";
 import { notFound, redirect } from "next/navigation";
@@ -29,24 +30,47 @@ export default async function MemberProfilePage({
     .order("sort_order");
 
   const fields = [
-    ["Bio", m.bio],
-    ["Interests", m.interests],
-    ["LinkedIn", m.linkedin_url],
-    ["GitHub", m.github_url],
-    ["Website", m.website_url],
-  ].filter(([, v]) => v);
+    { label: "Bio", value: m.bio, kind: "text" as const },
+    { label: "Interests", value: m.interests, kind: "text" as const },
+    { label: "LinkedIn", value: m.linkedin_url, kind: "url" as const },
+    { label: "GitHub", value: m.github_url, kind: "url" as const },
+    { label: "Website", value: m.website_url, kind: "url" as const },
+  ].filter((f): f is { label: string; value: string; kind: "text" | "url" } => Boolean(f.value));
+
+  const photoUrl = await signedPhotoUrl(m.photo_path);
 
   return (
     <article>
-      <h1 className="font-heading text-3xl font-bold text-white">{m.full_name}</h1>
-      <p className="mt-2 text-sm text-white/50">
-        {[m.program, m.grad_year].filter(Boolean).join(" · ")}
-      </p>
+      <div className="flex items-start gap-4">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt="" className="h-20 w-20 object-cover" />
+        ) : null}
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-white">{m.full_name}</h1>
+          <p className="mt-2 text-sm text-white/50">
+            {[m.program, m.grad_year].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+      </div>
       <dl className="mt-8 space-y-4">
-        {fields.map(([label, value]) => (
-          <div key={label}>
-            <dt className="text-[11px] uppercase tracking-wider text-white/60">{label}</dt>
-            <dd className="mt-1 whitespace-pre-wrap text-sm text-white/75">{value}</dd>
+        {fields.map((field) => (
+          <div key={field.label}>
+            <dt className="text-[11px] uppercase tracking-wider text-white/60">{field.label}</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-sm text-white/75">
+              {field.kind === "url" && /^https?:\/\//i.test(field.value) ? (
+                <a
+                  href={field.value}
+                  className="text-blue-light hover:text-white"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {field.value}
+                </a>
+              ) : (
+                field.value
+              )}
+            </dd>
           </div>
         ))}
       </dl>

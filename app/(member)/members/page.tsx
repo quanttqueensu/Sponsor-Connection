@@ -1,5 +1,6 @@
 import PageHeader from "@/components/PageHeader";
 import { getCurrentProfile } from "@/lib/auth";
+import { signedPhotoUrl } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import Link from "next/link";
@@ -53,6 +54,9 @@ export default async function MembersPage({
   const total = count ?? 0;
   const hasPrev = page > 1;
   const hasNext = from + rows.length < total;
+  const cards = await Promise.all(
+    rows.map(async (m) => ({ ...m, photoUrl: await signedPhotoUrl(m.photo_path) })),
+  );
 
   return (
     <>
@@ -82,17 +86,25 @@ export default async function MembersPage({
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {rows.map((m) => (
+          {cards.map((m) => (
             <Link
               key={m.id}
               href={`/members/${m.id}`}
               className="border border-white/10 p-5 hover:border-white/20"
             >
-              <p className="font-heading text-lg font-bold text-white">{m.full_name}</p>
-              <p className="mt-1 text-sm text-white/50">
-                {[m.program, m.grad_year].filter(Boolean).join(" · ")}
-              </p>
-              {m.bio && <p className="mt-2 line-clamp-2 text-sm text-white/65">{m.bio}</p>}
+              <div className="flex gap-4">
+                {m.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.photoUrl} alt="" className="h-12 w-12 object-cover" />
+                ) : null}
+                <div>
+                  <p className="font-heading text-lg font-bold text-white">{m.full_name}</p>
+                  <p className="mt-1 text-sm text-white/50">
+                    {[m.program, m.grad_year].filter(Boolean).join(" · ")}
+                  </p>
+                  {m.bio && <p className="mt-2 line-clamp-2 text-sm text-white/65">{m.bio}</p>}
+                </div>
+              </div>
             </Link>
           ))}
         </div>

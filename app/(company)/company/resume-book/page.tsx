@@ -1,0 +1,108 @@
+import LockedCard from "@/components/LockedCard";
+import Notice from "@/components/Notice";
+import PageHeader from "@/components/PageHeader";
+import TalentList, { type TalentRow } from "@/components/TalentList";
+import { Field, TextInput } from "@/components/Form";
+import { getCurrentProfile } from "@/lib/auth";
+import { can, liveCan, liveTier, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+
+function cleanTerm(raw: string | undefined) {
+  return String(raw ?? "")
+    .replace(/[%_\\]/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+export default async function ResumeBookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ program?: string; year?: string; denied?: string }>;
+}) {
+  const sp = await searchParams;
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  const supabase = await createClient();
+  const { data: cu } = await supabase
+    .from("company_users")
+    .select("company_id")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  if (!cu) redirect("/company");
+
+  const [{ assigned, effective }, tiers] = await Promise.all([
+    loadMyCompanyTier(cu.company_id),
+    loadTiers(),
+  ]);
+
+  const program = cleanTerm(sp.program);
+  const yearRaw = String(sp.year ?? "").trim();
+  const year = yearRaw === "" ? null : Number(yearRaw);
+  const yearOk = year === null || (Number.isInteger(year) && year >= 1900 && year <= 2100);
+
+  const { data: members } = liveCan(assigned, effective, "resume_book")
+    ? await supabase.rpc("resume_book_list", {
+        p_program: program || null,
+        p_grad_year: yearOk ? year : null,
+      })
+    : { data: [] as TalentRow[] };
+
+  const bookTier = liveTier(assigned, effective, "resume_book");
+  const delay = bookTier?.resume_book_embargo_hours ?? 0;
+
+  return (
+    <>
+      <PageHeader kicker="Talent" title="Resume book">
+        Members who opted in, with the resume on their default hiring package.
+      </PageHeader>
+      <Notice message={sp.denied} />
+      <LockedCard
+        capability="resume_book"
+        tier={bookTier}
+        tiers={tiers}
+        title="Resume book"
+        description="Your current sponsorship does not include the opt-in member resume book."
+      >
+        {assigned &&
+          !can(assigned, "resume_book") &&
+          can(effective, "resume_book") && (
+            <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
+              You can browse the book during grandfathering. It will lock when your{" "}
+              {assigned.name} package takes effect.
+            </p>
+          )}
+        {delay > 0 && (
+          <p className="mb-6 text-sm text-white/60">
+            New opt-ins appear after {delay} hours at your tier.
+          </p>
+        )}
+        <form method="get" className="mb-8 grid max-w-xl gap-3 md:grid-cols-3">
+          <Field label="Program">
+            <TextInput name="program" defaultValue={program} maxLength={80} />
+          </Field>
+          <Field label="Grad year">
+            <TextInput name="year" type="number" defaultValue={yearRaw} />
+          </Field>
+          <div className="flex items-end">
+            <button className="rounded bg-primary px-4 py-2 text-xs uppercase tracking-wider text-white">
+              Filter
+            </button>
+          </div>
+        </form>
+        <TalentList
+          members={(members as TalentRow[] | null) ?? []}
+          companyId={cu.company_id}
+          returnTo="/company/resume-book"
+          dmTier={liveTier(assigned, effective, "dm_initiate_any")}
+          tiers={tiers}
+          empty={
+            program || yearRaw
+              ? "No opted-in members match these filters."
+              : "No opted-in members yet."
+          }
+        />
+      </LockedCard>
+    </>
+  );
+}

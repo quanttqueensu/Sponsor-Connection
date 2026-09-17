@@ -49,17 +49,27 @@ export default async function ApplicantsPage({
         title="Applicant pipeline"
         description="Your current sponsorship does not include seeing who applied in the hub."
       >
-        {embargo > 0 && (
+        {can(effective, "read_applicants") && embargo > 0 && (
           <p className="mb-6 text-sm text-white/60">
             New applications appear after {embargo} hours at your tier.
           </p>
         )}
-        {assigned && !can(assigned, "read_applicants") && can(effective, "read_applicants") && (
-          <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
-            This pipeline is still open during grandfathering. It will lock when your{" "}
-            {assigned.name} package takes effect.
-          </p>
-        )}
+        {assigned &&
+          !can(assigned, "read_applicants") &&
+          can(effective, "read_applicants") && (
+            <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
+              This pipeline is still open during grandfathering. It will lock when your{" "}
+              {assigned.name} package takes effect.
+            </p>
+          )}
+        <p className="mb-6">
+          <a
+            href="/company/applicants/export"
+            className="text-xs uppercase tracking-wider text-blue-light"
+          >
+            Download CSV
+          </a>
+        </p>
         <ul>
           {(apps as Application[] | null)?.map((a) => (
             <li key={a.id} className="border-t border-white/10 py-4">

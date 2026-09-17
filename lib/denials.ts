@@ -47,6 +47,8 @@ const MESSAGES = {
     "That hiring package could not be used. Recreate it from Hiring packages, then apply again.",
   application_cover_invalid:
     "That application was not submitted. Keep the cover letter under 4,000 characters, or upload a PDF instead.",
+  application_firm_not_accepting:
+    "You cannot apply to this listing in the hub.",
 
   // lib/actions/auth.ts
   login_failed: "Could not log in. Check your email and password and try again.",
@@ -107,6 +109,14 @@ const MESSAGES = {
   // lib/actions/messages.ts
   message_invalid:
     "That message was not sent. Write something first, and keep it under 4,000 characters.",
+  conversation_start_forbidden:
+    "You do not have permission to start that conversation.",
+
+  // lib/actions/company.ts
+  company_url_invalid:
+    "That website or logo address isn't valid. Use a full http:// or https:// web address, or leave it blank.",
+  company_profile_invalid:
+    "That firm profile was not saved. Keep the description short and try again.",
 
   // lib/actions/profile.ts
   profile_save_failed:

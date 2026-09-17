@@ -25,6 +25,25 @@ export function can(tier: TierWithCaps | null | undefined, key: CapabilityKey) {
   return Boolean(tier?.sponsor_tier_capabilities?.some((c) => c.capability === key));
 }
 
+/** Assigned package or still-live grandfathered package. */
+export function liveCan(
+  assigned: TierWithCaps | null | undefined,
+  effective: TierWithCaps | null | undefined,
+  key: CapabilityKey,
+) {
+  return can(assigned, key) || can(effective, key);
+}
+
+export function liveTier(
+  assigned: TierWithCaps | null | undefined,
+  effective: TierWithCaps | null | undefined,
+  key: CapabilityKey,
+) {
+  if (can(effective, key)) return effective ?? null;
+  if (can(assigned, key)) return assigned ?? null;
+  return assigned ?? effective ?? null;
+}
+
 export function capValue(tier: TierWithCaps | null | undefined, key: CapabilityKey) {
   return tier?.sponsor_tier_capabilities?.find((c) => c.capability === key)?.value ?? null;
 }
@@ -40,6 +59,19 @@ export function lowestTierWith(tiers: TierWithCaps[], key: CapabilityKey) {
 export function graceIsOpen(until: string | null | undefined) {
   if (!until) return false;
   return until >= new Date().toISOString().slice(0, 10);
+}
+
+/** True if this firm's live access is `tierId` (assigned, or still in grace on it). */
+export function livesOnTier(
+  company: {
+    sponsor_tier_id: string;
+    grace_tier_id: string | null;
+    tier_grace_until?: string | null;
+  },
+  tierId: string,
+) {
+  if (company.sponsor_tier_id === tierId) return true;
+  return company.grace_tier_id === tierId && graceIsOpen(company.tier_grace_until);
 }
 
 export function priceDollars(cents: number | null) {

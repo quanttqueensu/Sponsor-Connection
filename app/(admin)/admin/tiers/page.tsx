@@ -9,7 +9,15 @@ import {
   saveTierCapabilities,
   updateTier,
 } from "@/lib/actions/tiers";
-import { can, capValue, formatPrice, loadCapabilities, loadTiers, priceDollars } from "@/lib/tiers";
+import {
+  can,
+  capValue,
+  formatPrice,
+  livesOnTier,
+  loadCapabilities,
+  loadTiers,
+  priceDollars,
+} from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { CapabilityKey } from "@/lib/tiers";
 import type { SponsorCapability } from "@/lib/types";
@@ -45,7 +53,7 @@ export default async function AdminTiersPage({
   const [tiers, capabilities, { data: companies }, { data: events }] = await Promise.all([
     loadTiers({ includeInactive: true }),
     loadCapabilities(),
-    supabase.from("companies").select("id, sponsor_tier_id"),
+    supabase.from("companies").select("id, sponsor_tier_id, grace_tier_id, tier_grace_until"),
     supabase
       .from("sponsor_tier_events")
       .select("id, kind, created_at, detail, sponsor_tiers(name), companies(name)")
@@ -55,7 +63,20 @@ export default async function AdminTiersPage({
 
   const firmCount = new Map<string, number>();
   for (const c of companies ?? []) {
-    firmCount.set(c.sponsor_tier_id, (firmCount.get(c.sponsor_tier_id) ?? 0) + 1);
+    for (const tier of tiers) {
+      if (
+        livesOnTier(
+          {
+            sponsor_tier_id: c.sponsor_tier_id,
+            grace_tier_id: (c.grace_tier_id as string | null) ?? null,
+            tier_grace_until: (c.tier_grace_until as string | null) ?? null,
+          },
+          tier.id,
+        )
+      ) {
+        firmCount.set(tier.id, (firmCount.get(tier.id) ?? 0) + 1);
+      }
+    }
   }
 
   const warnings = monotonicWarnings(tiers, capabilities);
@@ -63,8 +84,9 @@ export default async function AdminTiersPage({
   return (
     <>
       <PageHeader kicker="Packages" title="Sponsor tiers">
-        Reprice a package, rename it, or grant and revoke the capabilities this hub already
-        enforces. You cannot invent a new capability from here — those live in code.
+        Reprice a package, rename it, or grant and revoke hub functionality. Ticking a
+        capability here is what firms actually get — including the resume book, candidate
+        search, and messaging opted-in members.
       </PageHeader>
       <Notice message={sp.denied} />
 
@@ -96,6 +118,9 @@ export default async function AdminTiersPage({
           </Field>
           <Field label="Applicant delay (hours)">
             <TextInput name="embargo" type="number" min={0} max={8760} defaultValue="0" />
+          </Field>
+          <Field label="Resume book delay (hours)">
+            <TextInput name="resume_book_embargo" type="number" min={0} max={8760} defaultValue="0" />
           </Field>
           <div className="md:col-span-2">
             <Field label="Blurb">
@@ -152,6 +177,15 @@ export default async function AdminTiersPage({
                     min={0}
                     max={8760}
                     defaultValue={tier.applicant_embargo_hours}
+                  />
+                </Field>
+                <Field label="Resume book delay (hours)">
+                  <TextInput
+                    name="resume_book_embargo"
+                    type="number"
+                    min={0}
+                    max={8760}
+                    defaultValue={tier.resume_book_embargo_hours}
                   />
                 </Field>
                 <div className="md:col-span-2">

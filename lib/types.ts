@@ -14,6 +14,8 @@
  *   supabase/migrations/0007_sponsor_tiers.sql — sponsor_* tables
  *   supabase/migrations/0008_company_tiers.sql — companies.sponsor_tier_id, grace
  *   supabase/migrations/0009_tier_policies.sql — capability-gated RLS (no new columns)
+ *   supabase/migrations/0010_tier_enforcement_fixes.sql — no new columns
+ *   supabase/migrations/0011_resume_book_search_and_dm.sql — resume_book_embargo_hours
  *
  * If you add, rename, retype, or change the nullability of a column in a
  * migration, update the matching type in this file in the same commit.
@@ -46,6 +48,7 @@ export type SponsorTier = {
   price_cents: number | null;
   blurb: string;
   applicant_embargo_hours: number;
+  resume_book_embargo_hours: number;
   is_active: boolean;
   is_system: boolean;
   created_at: string;
