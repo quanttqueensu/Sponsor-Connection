@@ -116,6 +116,8 @@ describe("RLS denial is observable", () => {
       "join_request_failed",
       "invite_failed",
       "login_failed",
+      "login_misconfigured",
+      "login_account_missing",
       "application_package_path_invalid",
       "message_invalid",
       "post_invalid",

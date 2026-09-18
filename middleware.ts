@@ -33,6 +33,12 @@ function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+function redirectKeepingSession(url: URL, supabaseResponse: NextResponse) {
+  const res = NextResponse.redirect(url);
+  supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+  return res;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -68,84 +74,72 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role, is_admin").eq("id", user.id).maybeSingle()
+    : { data: null };
+
   if (user && userNeedsPassword(user) && !pathname.startsWith("/auth/")) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/auth/set-password";
-    const res = NextResponse.redirect(redirect);
-    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-    return res;
+    return redirectKeepingSession(redirect, supabaseResponse);
   }
 
   if (!user && !isPublic(pathname)) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/login";
-    return NextResponse.redirect(redirect);
+    return redirectKeepingSession(redirect, supabaseResponse);
   }
 
-  if (user && (pathname === "/login" || pathname === "/")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
+  if (
+    user &&
+    !profile &&
+    !pathname.startsWith("/login") &&
+    !pathname.startsWith("/auth/")
+  ) {
+    const redirect = request.nextUrl.clone();
+    redirect.pathname = "/login";
+    redirect.searchParams.set("error", "login_account_missing");
+    return redirectKeepingSession(redirect, supabaseResponse);
+  }
 
-    if (pathname === "/login" && profile && !userNeedsPassword(user)) {
+  if (pathname === "/login" && profile && !userNeedsPassword(user)) {
+    const redirect = request.nextUrl.clone();
+    redirect.pathname = profile.role === "company_user" ? "/company" : "/feed";
+    return redirectKeepingSession(redirect, supabaseResponse);
+  }
+
+  if (profile?.role === "company_user") {
+    const blocked =
+      pathname.startsWith("/feed") ||
+      pathname.startsWith("/members") ||
+      pathname.startsWith("/packages") ||
+      pathname.startsWith("/applications") ||
+      pathname.startsWith("/profile") ||
+      pathname.startsWith("/messages") ||
+      pathname.startsWith("/admin") ||
+      pathname === "/";
+    if (blocked) {
       const redirect = request.nextUrl.clone();
-      redirect.pathname = profile.role === "company_user" ? "/company" : "/feed";
-      const res = NextResponse.redirect(redirect);
-      supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-      return res;
+      redirect.pathname = "/company";
+      return redirectKeepingSession(redirect, supabaseResponse);
     }
   }
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profile?.role === "company_user") {
-      const blocked =
-        pathname.startsWith("/feed") ||
-        pathname.startsWith("/members") ||
-        pathname.startsWith("/packages") ||
-        pathname.startsWith("/applications") ||
-        pathname.startsWith("/profile") ||
-        pathname.startsWith("/messages") ||
-        pathname.startsWith("/admin") ||
-        pathname === "/";
-      if (blocked) {
-        const redirect = request.nextUrl.clone();
-        redirect.pathname = "/company";
-        const res = NextResponse.redirect(redirect);
-        supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-        return res;
-      }
+  if (profile?.role === "member") {
+    if (pathname.startsWith("/company")) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/feed";
+      return redirectKeepingSession(redirect, supabaseResponse);
     }
-
-    if (profile?.role === "member") {
-      if (pathname.startsWith("/company")) {
-        const redirect = request.nextUrl.clone();
-        redirect.pathname = "/feed";
-        const res = NextResponse.redirect(redirect);
-        supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-        return res;
-      }
-      if (pathname.startsWith("/admin") && !profile.is_admin) {
-        const redirect = request.nextUrl.clone();
-        redirect.pathname = "/feed";
-        const res = NextResponse.redirect(redirect);
-        supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-        return res;
-      }
-      if (pathname === "/") {
-        const redirect = request.nextUrl.clone();
-        redirect.pathname = "/feed";
-        const res = NextResponse.redirect(redirect);
-        supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-        return res;
-      }
+    if (pathname.startsWith("/admin") && !profile.is_admin) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/feed";
+      return redirectKeepingSession(redirect, supabaseResponse);
+    }
+    if (pathname === "/") {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/feed";
+      return redirectKeepingSession(redirect, supabaseResponse);
     }
   }
 

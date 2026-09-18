@@ -52,6 +52,10 @@ const MESSAGES = {
 
   // lib/actions/auth.ts
   login_failed: "Could not log in. Check your email and password and try again.",
+  login_misconfigured:
+    "This copy of the hub is not connected to the database. Copy .env.example to .env.local and add the Supabase keys, or set them on the host.",
+  login_account_missing:
+    "You're signed in, but this account is not set up in the hub yet. Ask a QUANTT exec to check your invite.",
   login_reset_email_required:
     "Enter your email address, then choose “Forgot your password?”.",
   login_link_expired: "That sign-in link expired. Ask for a new invite, or use “Forgot your password?”.",
@@ -78,6 +82,11 @@ const MESSAGES = {
     "We could not submit that request right now. Check your details and try again, or email the QUANTT team directly.",
   company_tier_assign_failed:
     "That firm's tier could not be changed. The firm may have been removed, or your account may no longer have admin rights.",
+  company_status_invalid: "Choose whether this firm is active or inactive.",
+  company_access_save_failed:
+    "That firm's hub access could not be saved. The firm may have been removed, or your account may no longer have admin rights.",
+  company_capability_value_invalid:
+    "That job limit isn't a valid whole number. Leave it blank for unlimited, or enter a whole number of slots.",
   admins_only: "You need exec access to do that.",
 
   // lib/actions/tiers.ts

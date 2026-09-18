@@ -1,16 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { userNeedsPassword } from "@/lib/auth-session";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 async function homeForUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return "/login";
+  if (!user) return "/login?error=login_failed";
   if (userNeedsPassword(user)) return "/auth/set-password";
 
   const { data: profile } = await supabase
@@ -19,10 +20,14 @@ async function homeForUser(supabase: Awaited<ReturnType<typeof createClient>>) {
     .eq("id", user.id)
     .maybeSingle();
 
-  return profile?.role === "company_user" ? "/company" : "/feed";
+  if (!profile) return "/login?error=login_account_missing";
+  return profile.role === "company_user" ? "/company" : "/feed";
 }
 
 export async function login(formData: FormData) {
+  if (!isSupabaseConfigured()) {
+    redirect("/login?error=login_misconfigured");
+  }
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
@@ -33,7 +38,9 @@ export async function login(formData: FormData) {
     // the hub's own chrome. One code, one lookup, nothing from the driver.
     redirect("/login?error=login_failed");
   }
-  redirect(await homeForUser(supabase));
+  const dest = await homeForUser(supabase);
+  revalidatePath("/", "layout");
+  redirect(dest);
 }
 
 /**
@@ -118,6 +125,7 @@ export async function setPassword(formData: FormData) {
     redirect("/auth/set-password?error=password_save_failed");
   }
   await supabase.auth.refreshSession();
+  revalidatePath("/", "layout");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -125,11 +133,13 @@ export async function setPassword(formData: FormData) {
     .eq("id", user.id)
     .maybeSingle();
 
-  redirect(profile?.role === "company_user" ? "/company" : "/feed");
+  if (!profile) redirect("/login?error=login_account_missing");
+  redirect(profile.role === "company_user" ? "/company" : "/feed");
 }
 
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  revalidatePath("/", "layout");
   redirect("/login");
 }

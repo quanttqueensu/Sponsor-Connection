@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 import AdminNav from "@/components/AdminNav";
-import { getCurrentProfile } from "@/lib/auth";
+import { requireCurrentProfile } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  const profile = await requireCurrentProfile();
   if (!profile.is_admin) redirect("/feed");
 
   return (

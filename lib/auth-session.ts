@@ -22,3 +22,21 @@ export function parseAuthHash(hash: string) {
     error_description: params.get("error_description"),
   };
 }
+
+/**
+ * Invite / recovery / magic links often land on `/` or `/login` because that
+ * is the Supabase Site URL. The only page that exchanges them is
+ * `/auth/callback`. Forward rather than dropping the tokens.
+ */
+export function shouldForwardToAuthCallback(
+  pathname: string,
+  search: string,
+  hash: string,
+) {
+  if (pathname.startsWith("/auth/callback")) return false;
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  if (params.get("code") || params.get("token_hash")) return true;
+  const parsed = parseAuthHash(hash);
+  if (parsed.error) return true;
+  return Boolean(parsed.access_token && parsed.refresh_token);
+}

@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
 import HubNav from "@/components/HubNav";
-import { getCurrentProfile } from "@/lib/auth";
+import { requireCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function MemberLayout({ children }: { children: ReactNode }) {
-  const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  const profile = await requireCurrentProfile();
   if (profile.role === "company_user") redirect("/company");
 
   const supabase = await createClient();
