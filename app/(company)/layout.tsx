@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import HubNav from "@/components/HubNav";
-import { getCurrentProfile } from "@/lib/auth";
+import { requireCurrentProfile } from "@/lib/auth";
 import { graceIsOpen, loadMyCompanyTier } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/time";
@@ -8,8 +8,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 export default async function CompanyLayout({ children }: { children: ReactNode }) {
-  const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  const profile = await requireCurrentProfile();
   if (profile.role !== "company_user") redirect("/feed");
 
   const supabase = await createClient();
@@ -22,6 +21,7 @@ export default async function CompanyLayout({ children }: { children: ReactNode 
   let unread = 0;
   let graceUntil: string | null = null;
   let assignedName: string | null = null;
+  let companyCaps: string[] = [];
   if (cu) {
     // Only the single newest message per conversation, ordered explicitly, so
     // the cost tracks conversations rather than total message volume.
@@ -37,16 +37,17 @@ export default async function CompanyLayout({ children }: { children: ReactNode 
       return !c.company_last_read_at || last > c.company_last_read_at;
     }).length;
 
-    const { assigned, graceUntil: until } = await loadMyCompanyTier(cu.company_id);
+    const { assigned, access, graceUntil: until } = await loadMyCompanyTier(cu.company_id);
     graceUntil = until ?? null;
     assignedName = assigned?.name ?? null;
+    companyCaps = (access?.sponsor_tier_capabilities ?? []).map((c) => c.capability);
   }
 
   const showGrace = graceIsOpen(graceUntil);
 
   return (
     <>
-      <HubNav profile={profile} unread={unread} />
+      <HubNav profile={profile} unread={unread} companyCaps={companyCaps} />
       {showGrace && graceUntil && (
         <div className="border-b border-blue-light/30 bg-blue-light/10 px-5 py-3 text-center text-xs text-white/80">
           Your access is grandfathered until {formatDate(`${graceUntil}T12:00:00`)}. From then, your{" "}

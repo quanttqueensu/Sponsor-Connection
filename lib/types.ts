@@ -16,6 +16,7 @@
  *   supabase/migrations/0009_tier_policies.sql — capability-gated RLS (no new columns)
  *   supabase/migrations/0010_tier_enforcement_fixes.sql — no new columns
  *   supabase/migrations/0011_resume_book_search_and_dm.sql — resume_book_embargo_hours
+ *   supabase/migrations/0012_company_access_overrides.sql — company_capability_overrides
  *
  * If you add, rename, retype, or change the nullability of a column in a
  * migration, update the matching type in this file in the same commit.
@@ -66,6 +67,13 @@ export type SponsorCapability = {
 export type SponsorTierCapability = {
   tier_id: string;
   capability: string;
+  value: number | null;
+};
+
+export type CompanyCapabilityOverride = {
+  company_id: string;
+  capability: string;
+  granted: boolean;
   value: number | null;
 };
 

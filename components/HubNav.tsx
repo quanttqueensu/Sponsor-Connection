@@ -9,18 +9,27 @@ import type { Profile } from "@/lib/types";
 type Props = {
   profile: Profile;
   unread?: number;
+  /** Granted hub products for a company contact. Member nav ignores this. */
+  companyCaps?: string[];
 };
 
-export default function HubNav({ profile, unread = 0 }: Props) {
+export default function HubNav({ profile, unread = 0, companyCaps }: Props) {
   const pathname = usePathname();
   const isCompany = profile.role === "company_user";
+  const caps = new Set(companyCaps ?? []);
 
   const links = isCompany
     ? [
         { href: "/company", label: "Posts" },
-        { href: "/company/applicants", label: "Applicants" },
-        { href: "/company/resume-book", label: "Resume book" },
-        { href: "/company/search", label: "Search" },
+        ...(caps.has("read_applicants")
+          ? [{ href: "/company/applicants", label: "Applicants" }]
+          : []),
+        ...(caps.has("resume_book")
+          ? [{ href: "/company/resume-book", label: "Resume book" }]
+          : []),
+        ...(caps.has("candidate_search")
+          ? [{ href: "/company/search", label: "Search" }]
+          : []),
         { href: "/company/messages", label: "Messages" },
         { href: "/company/sponsorship", label: "Sponsorship" },
       ]

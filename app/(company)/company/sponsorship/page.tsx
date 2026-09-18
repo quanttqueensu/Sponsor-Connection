@@ -9,10 +9,12 @@ import {
   capValue,
   formatPrice,
   graceIsOpen,
+  liveCan,
   loadCapabilities,
   loadMyCompanyTier,
   loadTiers,
   lowestTierWith,
+  overrideFor,
 } from "@/lib/tiers";
 import type { CapabilityKey } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +37,7 @@ export default async function SponsorshipPage({
     .maybeSingle();
   if (!cu) redirect("/company");
 
-  const [{ assigned, effective, graceUntil }, capabilities, tiers, { data: company }] =
+  const [{ assigned, effective, access, overrides, graceUntil }, capabilities, tiers, { data: company }] =
     await Promise.all([
       loadMyCompanyTier(cu.company_id),
       loadCapabilities(),
@@ -53,7 +55,8 @@ export default async function SponsorshipPage({
   return (
     <>
       <PageHeader kicker="Package" title="Sponsorship">
-        What your firm bought, and what this hub actually unlocks.
+        What your firm bought, and what this hub currently unlocks for your contacts. You do not
+        see the member feed — that stays with QUANTT members.
       </PageHeader>
       <Notice message={sp.denied} />
       <div className="flex flex-wrap items-center gap-3">
@@ -74,9 +77,11 @@ export default async function SponsorshipPage({
       <ul className="mt-8 space-y-4">
         {capabilities.map((cap) => {
           const key = cap.key as CapabilityKey;
-          const included = can(display, key);
+          const included = can(access, key);
+          const onPackage = liveCan(assigned, effective, key);
+          const custom = overrideFor(overrides, key);
           const needed = included ? null : lowestTierWith(tiers, key);
-          const quota = cap.kind === "quota" ? capValue(display, key) : null;
+          const quota = cap.kind === "quota" ? capValue(access, key) : null;
           return (
             <li key={cap.key} className="border-t border-white/10 py-4">
               <p className="text-white">
@@ -86,9 +91,13 @@ export default async function SponsorshipPage({
                     ? quota == null
                       ? cap.kind === "quota"
                         ? "unlimited"
-                        : "included"
+                        : custom?.granted && !onPackage
+                          ? "added for your firm"
+                          : "included"
                       : `${quota} open jobs`
-                    : "not included"}
+                    : custom && !custom.granted
+                      ? "removed for your firm"
+                      : "not included"}
                 </span>
               </p>
               <p className="mt-1 text-sm text-white/55">{cap.description}</p>
@@ -99,14 +108,14 @@ export default async function SponsorshipPage({
           );
         })}
       </ul>
-      {display && display.applicant_embargo_hours > 0 && (
+      {access && access.applicant_embargo_hours > 0 && (
         <p className="mt-8 text-sm text-white/60">
-          New applications appear {display.applicant_embargo_hours} hours after they are submitted.
+          New applications appear {access.applicant_embargo_hours} hours after they are submitted.
         </p>
       )}
-      {display && display.resume_book_embargo_hours > 0 && can(display, "resume_book") && (
+      {access && access.resume_book_embargo_hours > 0 && can(access, "resume_book") && (
         <p className="mt-3 text-sm text-white/60">
-          New resume-book opt-ins appear {display.resume_book_embargo_hours} hours after a member
+          New resume-book opt-ins appear {access.resume_book_embargo_hours} hours after a member
           opts in.
         </p>
       )}

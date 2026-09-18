@@ -8,6 +8,13 @@ import { notify } from "@/lib/notify";
 import { authCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  graceIsOpen,
+  liveCan,
+  loadTiers,
+  packageValue,
+  type CapabilityKey,
+} from "@/lib/tiers";
 import { denyRedirect } from "./deny";
 
 const MANUAL_INVITE_COOKIE = "hub_manual_invite";
@@ -494,34 +501,165 @@ export async function reviewJoinRequest(formData: FormData) {
   }
 }
 
+function revalidateCompanyAccess() {
+  revalidatePath("/admin/companies");
+  revalidatePath("/admin/tiers");
+  revalidatePath("/feed");
+  revalidatePath("/company");
+  revalidatePath("/company/sponsorship");
+  revalidatePath("/company/resume-book");
+  revalidatePath("/company/search");
+  revalidatePath("/company/applicants");
+}
+
 export async function setCompanyTier(formData: FormData) {
   const profile = await requireProfile();
   if (!profile.is_admin) denyRedirect("/feed", "admins_only");
   const supabase = await createClient();
   const companyId = String(formData.get("company_id"));
   const tierId = String(formData.get("sponsor_tier_id"));
+  const status = String(formData.get("status") ?? "");
+  if (status !== "active" && status !== "inactive") {
+    denyRedirect("/admin/companies", "company_status_invalid");
+  }
   const { data: before } = await supabase
     .from("companies")
-    .select("sponsor_tier_id")
+    .select("sponsor_tier_id, status")
     .eq("id", companyId)
     .maybeSingle();
   const { data, error } = await supabase
     .from("companies")
-    .update({ sponsor_tier_id: tierId })
+    .update({ sponsor_tier_id: tierId, status })
     .eq("id", companyId)
     .select("id");
   if (error || !data?.length) denyRedirect("/admin/companies", "company_tier_assign_failed");
+  if (before?.sponsor_tier_id !== tierId) {
+    await supabase.from("sponsor_tier_events").insert({
+      kind: "company_assigned",
+      tier_id: tierId,
+      company_id: companyId,
+      actor_id: profile.id,
+      detail: { from: before?.sponsor_tier_id ?? null, to: tierId },
+    });
+  }
+  if (before?.status !== status) {
+    await supabase.from("sponsor_tier_events").insert({
+      kind: "company_status",
+      company_id: companyId,
+      actor_id: profile.id,
+      detail: { from: before?.status ?? null, to: status },
+    });
+  }
+  revalidateCompanyAccess();
+}
+
+export async function setCompanyAccess(formData: FormData) {
+  const profile = await requireProfile();
+  if (!profile.is_admin) denyRedirect("/feed", "admins_only");
+  const supabase = await createClient();
+  const companyId = String(formData.get("company_id"));
+
+  const [{ data: company }, { data: caps }, { data: current }, tiers] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("id, sponsor_tier_id, grace_tier_id, tier_grace_until")
+      .eq("id", companyId)
+      .maybeSingle(),
+    supabase.from("sponsor_capabilities").select("key, kind"),
+    supabase
+      .from("company_capability_overrides")
+      .select("capability, granted, value")
+      .eq("company_id", companyId),
+    loadTiers({ includeInactive: true }),
+  ]);
+  if (!company) denyRedirect("/admin/companies", "company_access_save_failed");
+
+  const assigned = tiers.find((t) => t.id === company.sponsor_tier_id) ?? null;
+  const graceOpen = graceIsOpen(company.tier_grace_until as string | null);
+  const effective =
+    graceOpen && company.grace_tier_id
+      ? (tiers.find((t) => t.id === company.grace_tier_id) ?? assigned)
+      : assigned;
+
+  const next: { capability: string; granted: boolean; value: number | null }[] = [];
+  for (const cap of caps ?? []) {
+    const granted = formData.get(`grant_${cap.key}`) === "on";
+    let value: number | null = null;
+    if (granted && cap.kind === "quota") {
+      const raw = String(formData.get(`value_${cap.key}`) ?? "").trim();
+      if (raw) {
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n < 0) {
+          denyRedirect("/admin/companies", "company_capability_value_invalid");
+        }
+        value = n;
+      }
+    }
+    const pkgGranted = liveCan(assigned, effective, cap.key as CapabilityKey);
+    const pkgValue = packageValue(assigned, effective, cap.key as CapabilityKey);
+    const matchesPackage = granted === pkgGranted && (!granted || value === pkgValue);
+    if (!matchesPackage) next.push({ capability: cap.key, granted, value: granted ? value : null });
+  }
+
+  const currentMap = new Map(
+    (current ?? []).map((r) => [
+      r.capability as string,
+      { granted: r.granted as boolean, value: r.value as number | null },
+    ]),
+  );
+  const nextMap = new Map(next.map((r) => [r.capability, r]));
+
+  for (const row of next) {
+    const prev = currentMap.get(row.capability);
+    if (prev && prev.granted === row.granted && prev.value === row.value) continue;
+    const { error } = await supabase.from("company_capability_overrides").upsert(
+      {
+        company_id: companyId,
+        capability: row.capability,
+        granted: row.granted,
+        value: row.value,
+      },
+      { onConflict: "company_id,capability" },
+    );
+    if (error) denyRedirect("/admin/companies", "company_access_save_failed");
+  }
+
+  for (const key of currentMap.keys()) {
+    if (nextMap.has(key)) continue;
+    const { error } = await supabase
+      .from("company_capability_overrides")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("capability", key);
+    if (error) denyRedirect("/admin/companies", "company_access_save_failed");
+  }
+
   await supabase.from("sponsor_tier_events").insert({
-    kind: "company_assigned",
-    tier_id: tierId,
+    kind: "company_access",
     company_id: companyId,
     actor_id: profile.id,
-    detail: { from: before?.sponsor_tier_id ?? null, to: tierId },
+    detail: { overrides: next },
   });
-  revalidatePath("/admin/companies");
-  revalidatePath("/admin/tiers");
-  revalidatePath("/feed");
-  revalidatePath("/company");
+  revalidateCompanyAccess();
+}
+
+export async function resetCompanyAccess(formData: FormData) {
+  const profile = await requireProfile();
+  if (!profile.is_admin) denyRedirect("/feed", "admins_only");
+  const supabase = await createClient();
+  const companyId = String(formData.get("company_id"));
+  const { error } = await supabase
+    .from("company_capability_overrides")
+    .delete()
+    .eq("company_id", companyId);
+  if (error) denyRedirect("/admin/companies", "company_access_save_failed");
+  await supabase.from("sponsor_tier_events").insert({
+    kind: "company_access",
+    company_id: companyId,
+    actor_id: profile.id,
+    detail: { overrides: [] },
+  });
+  revalidateCompanyAccess();
 }
 
 const MAX_COMPANY_NAME = 200;

@@ -18,8 +18,8 @@ export async function GET() {
     .maybeSingle();
   if (!cu) return new NextResponse("Not found", { status: 404 });
 
-  const { effective } = await loadMyCompanyTier(cu.company_id);
-  if (!can(effective, "read_applicants")) {
+  const { access } = await loadMyCompanyTier(cu.company_id);
+  if (!can(access, "read_applicants")) {
     return new NextResponse("Not found", { status: 404 });
   }
 

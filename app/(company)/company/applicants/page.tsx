@@ -2,7 +2,7 @@ import LockedCard from "@/components/LockedCard";
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { getCurrentProfile } from "@/lib/auth";
-import { can, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
+import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { Application } from "@/lib/types";
 import Link from "next/link";
@@ -24,7 +24,7 @@ export default async function ApplicantsPage({
     .maybeSingle();
   if (!cu) redirect("/company");
 
-  const [{ assigned, effective }, tiers] = await Promise.all([
+  const [{ assigned, effective, access, overrides }, tiers] = await Promise.all([
     loadMyCompanyTier(cu.company_id),
     loadTiers(),
   ]);
@@ -36,7 +36,7 @@ export default async function ApplicantsPage({
     .eq("company_id", cu.company_id)
     .order("created_at", { ascending: false });
 
-  const embargo = effective?.applicant_embargo_hours ?? 0;
+  const embargo = access?.applicant_embargo_hours ?? 0;
 
   return (
     <>
@@ -44,22 +44,20 @@ export default async function ApplicantsPage({
       <Notice message={sp.denied} />
       <LockedCard
         capability="read_applicants"
-        tier={effective}
+        tier={access}
         tiers={tiers}
         title="Applicant pipeline"
-        description="Your current sponsorship does not include seeing who applied in the hub."
+        description="Your current access does not include seeing who applied in the hub."
       >
-        {can(effective, "read_applicants") && embargo > 0 && (
+        {can(access, "read_applicants") && embargo > 0 && (
           <p className="mb-6 text-sm text-white/60">
             New applications appear after {embargo} hours at your tier.
           </p>
         )}
-        {assigned &&
-          !can(assigned, "read_applicants") &&
-          can(effective, "read_applicants") && (
+        {graceOnlyCap(assigned, effective, overrides, "read_applicants") && (
             <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
               This pipeline is still open during grandfathering. It will lock when your{" "}
-              {assigned.name} package takes effect.
+              {assigned?.name} package takes effect.
             </p>
           )}
         <p className="mb-6">

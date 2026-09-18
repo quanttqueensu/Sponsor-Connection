@@ -3,7 +3,7 @@ import { updateApplicationStage } from "@/lib/actions/applications";
 import LockedAction from "@/components/LockedAction";
 import LockedCard from "@/components/LockedCard";
 import { getCurrentProfile } from "@/lib/auth";
-import { can, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
+import { graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformJob, kindLabel, type Application, type Post } from "@/lib/types";
 import { notFound, redirect } from "next/navigation";
@@ -28,7 +28,7 @@ export default async function CompanyPostPage({
   if (!cu || !post || post.company_id !== cu.company_id) notFound();
   const p = post as Post;
 
-  const [{ assigned, effective }, tiers] = await Promise.all([
+  const [{ assigned, effective, access, overrides }, tiers] = await Promise.all([
     loadMyCompanyTier(cu.company_id),
     loadTiers(),
   ]);
@@ -50,18 +50,16 @@ export default async function CompanyPostPage({
         <section className="mt-10">
           <LockedCard
             capability="read_applicants"
-            tier={effective}
+            tier={access}
             tiers={tiers}
             title="Applicants"
-            description="Your current sponsorship does not include seeing who applied to this posting."
+            description="Your current access does not include seeing who applied to this posting."
           >
             <h2 className="font-heading text-lg font-bold text-white">Applicants</h2>
-            {assigned &&
-              !can(assigned, "read_applicants") &&
-              can(effective, "read_applicants") && (
+            {graceOnlyCap(assigned, effective, overrides, "read_applicants") && (
                 <p className="mt-3 mb-2 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
                   Applicant access is still open during grandfathering. It will lock when your{" "}
-                  {assigned.name} package takes effect.
+                  {assigned?.name} package takes effect.
                 </p>
               )}
             <ul className="mt-4 space-y-4">
@@ -93,7 +91,7 @@ export default async function CompanyPostPage({
                     {a.member_id && p.company_id && (
                       <LockedAction
                         capability="dm_initiate_applicant"
-                        tier={effective}
+                        tier={access}
                         tiers={tiers}
                       >
                         <form action={startConversation}>

@@ -86,8 +86,8 @@ export async function createPost(formData: FormData) {
     if (profile.role === "company_user" && companyId) {
       if (kind === "event") denyRedirect(postFormPath, "post_kind_forbidden");
       if (isInApp) {
-        const { effective } = await loadMyCompanyTier(companyId);
-        if (!can(effective, "post_in_app_job")) {
+        const { access } = await loadMyCompanyTier(companyId);
+        if (!can(access, "post_in_app_job")) {
           denyRedirect(postFormPath, "post_kind_forbidden");
         }
         denyRedirect(postFormPath, "post_quota_reached");

@@ -24,26 +24,26 @@ export default async function NewCompanyPost({
     .maybeSingle();
   if (!cu) redirect("/company");
 
-  const [{ assigned, effective }, tiers] = await Promise.all([
+  const [{ access }, tiers] = await Promise.all([
     loadMyCompanyTier(cu.company_id),
     loadTiers(),
   ]);
 
   const kinds: PostKind[] = ["job", "job_link", "announcement"];
-  if (can(effective, "post_event")) kinds.splice(2, 0, "event");
+  if (can(access, "post_event")) kinds.splice(2, 0, "event");
 
   return (
     <>
       <PageHeader kicker="Company" title="New post" />
       <Notice message={sp.denied} />
-      {!can(assigned, "post_in_app_job") && (
+      {!can(access, "post_in_app_job") && (
         <div className="mb-8">
           <LockedCard
             capability="post_in_app_job"
-            tier={assigned}
+            tier={access}
             tiers={tiers}
             title="In-app applications"
-            description="Your package does not include jobs that take applications in the hub. You can still publish a listing with an external URL."
+            description="Your current access does not include jobs that take applications in the hub. You can still publish a listing with an external URL."
           />
         </div>
       )}

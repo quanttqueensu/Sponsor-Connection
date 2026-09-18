@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import TalentList, { type TalentRow } from "@/components/TalentList";
 import { Field, TextInput } from "@/components/Form";
 import { getCurrentProfile } from "@/lib/auth";
-import { can, liveCan, liveTier, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
+import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -31,7 +31,7 @@ export default async function CandidateSearchPage({
     .maybeSingle();
   if (!cu) redirect("/company");
 
-  const [{ assigned, effective }, tiers] = await Promise.all([
+  const [{ assigned, effective, access, overrides }, tiers] = await Promise.all([
     loadMyCompanyTier(cu.company_id),
     loadTiers(),
   ]);
@@ -42,7 +42,7 @@ export default async function CandidateSearchPage({
   const year = yearRaw === "" ? null : Number(yearRaw);
   const yearOk = year === null || (Number.isInteger(year) && year >= 1900 && year <= 2100);
 
-  const { data: members } = liveCan(assigned, effective, "candidate_search")
+  const { data: members } = can(access, "candidate_search")
     ? await supabase.rpc("candidate_search_list", {
         p_q: q || null,
         p_program: program || null,
@@ -58,16 +58,14 @@ export default async function CandidateSearchPage({
       <Notice message={sp.denied} />
       <LockedCard
         capability="candidate_search"
-        tier={liveTier(assigned, effective, "candidate_search")}
+        tier={access}
         tiers={tiers}
         title="Candidate search"
-        description="Your current sponsorship does not include searching the member book."
+        description="Your current access does not include searching the member book."
       >
-        {assigned &&
-          !can(assigned, "candidate_search") &&
-          can(effective, "candidate_search") && (
+        {graceOnlyCap(assigned, effective, overrides, "candidate_search") && (
             <p className="mb-6 border border-blue-light/30 bg-blue-light/10 p-4 text-sm text-white/80">
-              Search is still open during grandfathering. It will lock when your {assigned.name}{" "}
+              Search is still open during grandfathering. It will lock when your {assigned?.name}{" "}
               package takes effect.
             </p>
           )}
@@ -91,7 +89,7 @@ export default async function CandidateSearchPage({
           members={(members as TalentRow[] | null) ?? []}
           companyId={cu.company_id}
           returnTo="/company/search"
-          dmTier={liveTier(assigned, effective, "dm_initiate_any")}
+          dmTier={can(access, "dm_initiate_any") ? access : null}
           tiers={tiers}
           empty={
             q || program || yearRaw

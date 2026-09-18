@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import type { SponsorCapability, SponsorTier, SponsorTierCapability } from "@/lib/types";
+import type {
+  CompanyCapabilityOverride,
+  SponsorCapability,
+  SponsorTier,
+  SponsorTierCapability,
+} from "@/lib/types";
 
 export const CAPABILITY_KEYS = [
   "post_in_app_job",
@@ -46,6 +51,66 @@ export function liveTier(
 
 export function capValue(tier: TierWithCaps | null | undefined, key: CapabilityKey) {
   return tier?.sponsor_tier_capabilities?.find((c) => c.capability === key)?.value ?? null;
+}
+
+export function packageValue(
+  assigned: TierWithCaps | null | undefined,
+  effective: TierWithCaps | null | undefined,
+  key: CapabilityKey,
+) {
+  if (can(assigned, key)) return capValue(assigned, key);
+  if (can(effective, key)) return capValue(effective, key);
+  return null;
+}
+
+export function overrideFor(
+  overrides: Pick<CompanyCapabilityOverride, "capability" | "granted" | "value">[],
+  key: CapabilityKey,
+) {
+  return overrides.find((o) => o.capability === key) ?? null;
+}
+
+/** True when this cap is only live because of grandfathering, not an admin override. */
+export function graceOnlyCap(
+  assigned: TierWithCaps | null | undefined,
+  effective: TierWithCaps | null | undefined,
+  overrides: Pick<CompanyCapabilityOverride, "capability">[],
+  key: CapabilityKey,
+) {
+  if (overrides.some((o) => o.capability === key)) return false;
+  return Boolean(assigned && !can(assigned, key) && can(effective, key));
+}
+
+/**
+ * What this firm can actually do: assigned ∪ grace, then per-firm overrides.
+ * Embargo hours come from the still-live package (grace, else assigned).
+ */
+export function resolveAccess(
+  assigned: TierWithCaps | null,
+  effective: TierWithCaps | null,
+  overrides: Pick<CompanyCapabilityOverride, "capability" | "granted" | "value">[],
+): TierWithCaps | null {
+  const base = effective ?? assigned;
+  if (!base) return null;
+  const caps = new Map<string, number | null>();
+  for (const c of effective?.sponsor_tier_capabilities ?? []) {
+    caps.set(c.capability, c.value);
+  }
+  for (const c of assigned?.sponsor_tier_capabilities ?? []) {
+    caps.set(c.capability, c.value);
+  }
+  for (const o of overrides) {
+    if (o.granted) caps.set(o.capability, o.value);
+    else caps.delete(o.capability);
+  }
+  return {
+    ...base,
+    sponsor_tier_capabilities: [...caps.entries()].map(([capability, value]) => ({
+      tier_id: base.id,
+      capability,
+      value,
+    })),
+  };
 }
 
 export function lowestTierWith(tiers: TierWithCaps[], key: CapabilityKey) {
@@ -111,18 +176,26 @@ export async function loadTiers(opts: { includeInactive?: boolean } = {}): Promi
 
 export async function loadMyCompanyTier(companyId: string) {
   const supabase = await createClient();
-  const { data: company } = await supabase
-    .from("companies")
-    .select("sponsor_tier_id, grace_tier_id, tier_grace_until")
-    .eq("id", companyId)
-    .maybeSingle();
-  if (!company) {
-    return {
-      assigned: null as TierWithCaps | null,
-      effective: null as TierWithCaps | null,
-      graceUntil: null as string | null,
-    };
-  }
+  const [{ data: company }, { data: overrideRows }] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("sponsor_tier_id, grace_tier_id, tier_grace_until, status")
+      .eq("id", companyId)
+      .maybeSingle(),
+    supabase
+      .from("company_capability_overrides")
+      .select("capability, granted, value")
+      .eq("company_id", companyId),
+  ]);
+  const empty = {
+    assigned: null as TierWithCaps | null,
+    effective: null as TierWithCaps | null,
+    access: null as TierWithCaps | null,
+    overrides: [] as Pick<CompanyCapabilityOverride, "capability" | "granted" | "value">[],
+    graceUntil: null as string | null,
+    status: null as string | null,
+  };
+  if (!company) return empty;
 
   const tiers = await loadTiers({ includeInactive: true });
   const assigned = tiers.find((t) => t.id === company.sponsor_tier_id) ?? null;
@@ -131,9 +204,18 @@ export async function loadMyCompanyTier(companyId: string) {
     graceOpen && company.grace_tier_id
       ? (tiers.find((t) => t.id === company.grace_tier_id) ?? assigned)
       : assigned;
+  const overrides = (overrideRows ?? []) as Pick<
+    CompanyCapabilityOverride,
+    "capability" | "granted" | "value"
+  >[];
+  const merged = resolveAccess(assigned, effective, overrides);
+  const access = company.status === "active" ? merged : merged ? { ...merged, sponsor_tier_capabilities: [] } : null;
   return {
     assigned,
     effective,
+    access,
+    overrides,
     graceUntil: company.tier_grace_until as string | null,
+    status: company.status as string,
   };
 }
