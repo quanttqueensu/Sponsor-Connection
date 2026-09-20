@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
+import {
+  imageContentType,
+  imageExtension,
+  imageKind,
+  MAX_IMAGE_BYTES,
+} from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 import { denyRedirect } from "./deny";
 
@@ -60,6 +66,8 @@ export async function updateProfile(formData: FormData) {
     denyRedirect("/profile", "profile_save_failed");
   }
   revalidatePath("/profile");
+  revalidatePath("/members");
+  revalidatePath(`/members/${profile.id}`);
 }
 
 export async function addSection(formData: FormData) {
@@ -110,6 +118,8 @@ export async function addSection(formData: FormData) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/profile");
+  revalidatePath("/members");
+  revalidatePath(`/members/${profile.id}`);
 }
 
 export async function deleteSection(formData: FormData) {
@@ -128,6 +138,8 @@ export async function deleteSection(formData: FormData) {
     denyRedirect("/profile", "profile_section_missing");
   }
   revalidatePath("/profile");
+  revalidatePath("/members");
+  revalidatePath(`/members/${profile.id}`);
 }
 
 export async function uploadPhoto(formData: FormData) {
@@ -135,13 +147,12 @@ export async function uploadPhoto(formData: FormData) {
   if (profile.role !== "member") throw new Error("Members only");
   const file = formData.get("photo") as File | null;
   if (!file || file.size === 0) denyRedirect("/profile", "profile_photo_invalid");
-  if (file.size > 2 * 1024 * 1024) denyRedirect("/profile", "profile_photo_invalid");
+  if (file.size > MAX_IMAGE_BYTES) denyRedirect("/profile", "profile_photo_invalid");
   const kind = await imageKind(file);
   if (!kind) denyRedirect("/profile", "profile_photo_invalid");
   const supabase = await createClient();
-  const ext = kind === "png" ? "png" : kind === "webp" ? "webp" : "jpg";
-  const contentType =
-    kind === "png" ? "image/png" : kind === "webp" ? "image/webp" : "image/jpeg";
+  const ext = imageExtension(kind);
+  const contentType = imageContentType(kind);
   const path = `${profile.id}/photo.${ext}`;
   const { error } = await supabase.storage.from("photos").upload(path, file, {
     upsert: true,
@@ -159,6 +170,8 @@ export async function uploadPhoto(formData: FormData) {
     denyRedirect("/profile", "profile_photo_attach_failed");
   }
   revalidatePath("/profile");
+  revalidatePath("/members");
+  revalidatePath(`/members/${profile.id}`);
 }
 
 export async function setResumeBookOptIn(formData: FormData) {
@@ -183,6 +196,8 @@ export async function setResumeBookOptIn(formData: FormData) {
     );
   }
   revalidatePath("/profile");
+  revalidatePath("/members");
+  revalidatePath(`/members/${profile.id}`);
   revalidatePath("/company/resume-book");
   revalidatePath("/company/search");
 }
@@ -204,39 +219,4 @@ function overLimit(v: string | null, max: number) {
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;
-}
-
-/**
- * Trust the bytes, not `File.type`. Photos are readable by every member, so a
- * company user (or a member) uploading HTML labelled as image/jpeg would be
- * served to the directory as a "photo".
- */
-async function imageKind(file: File): Promise<"jpeg" | "png" | "webp" | null> {
-  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
-    return "jpeg";
-  }
-  if (
-    head.length >= 8 &&
-    head[0] === 0x89 &&
-    head[1] === 0x50 &&
-    head[2] === 0x4e &&
-    head[3] === 0x47
-  ) {
-    return "png";
-  }
-  if (
-    head.length >= 12 &&
-    head[0] === 0x52 &&
-    head[1] === 0x49 &&
-    head[2] === 0x46 &&
-    head[3] === 0x46 &&
-    head[8] === 0x57 &&
-    head[9] === 0x45 &&
-    head[10] === 0x42 &&
-    head[11] === 0x50
-  ) {
-    return "webp";
-  }
-  return null;
 }

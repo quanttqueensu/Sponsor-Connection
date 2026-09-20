@@ -2,31 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
+import { assertPdf, PDF_CONTENT_TYPE } from "@/lib/files";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { denyRedirect } from "./deny";
 
-const MAX_PDF_BYTES = 5 * 1024 * 1024;
 const MAX_NAME = 120;
 const MAX_URL = 500;
 const MAX_COVER = 4000;
-
-/**
- * Rejects anything that is not really a PDF.
- *
- * `File.type` is a client-supplied header: the browser sends whatever the
- * uploader claims, and the upload call below then pins `contentType` to that
- * same claim, so an arbitrary payload could be stored -- and later served --
- * as `application/pdf`. Checking the leading `%PDF-` signature costs one
- * 5-byte read and makes the stored type match the bytes.
- */
-async function assertPdf(file: File, label: string) {
-  if (file.type !== "application/pdf") throw new Error(`${label} must be a PDF`);
-  if (file.size > MAX_PDF_BYTES) throw new Error(`${label} must be under 5MB`);
-  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
-  const signature = String.fromCharCode(...head);
-  if (signature !== "%PDF-") throw new Error(`${label} must be a PDF`);
-}
 
 /**
  * Deletes package objects a failed createPackage/deletePackage already wrote.
@@ -52,16 +35,20 @@ export async function createPackage(formData: FormData) {
   const profile = await requireProfile();
   if (profile.role !== "member") throw new Error("Members only");
   const file = formData.get("resume") as File | null;
-  if (!file || file.size === 0) throw new Error("Upload a resume PDF");
-  await assertPdf(file, "Resume");
+  if (!file || file.size === 0) denyRedirect("/packages", "package_file_invalid");
+  try {
+    await assertPdf(file, "Resume");
+  } catch {
+    denyRedirect("/packages", "package_file_invalid");
+  }
 
   const name = String(formData.get("name") ?? "").trim();
-  const linkedinUrl = String(formData.get("linkedin_url") ?? "").trim();
+  const linkedinUrl = httpUrlOrNull(String(formData.get("linkedin_url") ?? "").trim());
   const coverLetter = emptyToNull(formData.get("cover_letter"));
+  if (!linkedinUrl) denyRedirect("/packages", "package_url_invalid");
   if (
     !name ||
     name.length > MAX_NAME ||
-    !linkedinUrl ||
     linkedinUrl.length > MAX_URL ||
     (coverLetter !== null && coverLetter.length > MAX_COVER)
   ) {
@@ -75,7 +62,7 @@ export async function createPackage(formData: FormData) {
   const written: string[] = [];
   const resumePath = `${profile.id}/packages/${id}/resume.pdf`;
   const { error: upErr } = await supabase.storage.from("resumes").upload(resumePath, file, {
-    contentType: "application/pdf",
+    contentType: PDF_CONTENT_TYPE,
     upsert: true,
   });
   if (upErr) throw new Error(upErr.message);
@@ -86,13 +73,13 @@ export async function createPackage(formData: FormData) {
   if (coverFile && coverFile.size > 0) {
     try {
       await assertPdf(coverFile, "Cover letter file");
-    } catch (e) {
+    } catch {
       await removePackageObjects(profile.id, id, written);
-      throw e;
+      denyRedirect("/packages", "package_file_invalid");
     }
     coverPath = `${profile.id}/packages/${id}/cover.pdf`;
     const { error } = await supabase.storage.from("resumes").upload(coverPath, coverFile, {
-      contentType: "application/pdf",
+      contentType: PDF_CONTENT_TYPE,
       upsert: true,
     });
     if (error) {
@@ -170,4 +157,15 @@ export async function deletePackage(formData: FormData) {
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;
+}
+
+function httpUrlOrNull(raw: string) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
 }

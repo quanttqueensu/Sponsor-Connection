@@ -13,6 +13,8 @@ import { NextResponse } from "next/server";
  * until someone actually clicks, the click is re-authorised here against the
  * caller's own company, and the URL that comes back lives ~90 seconds -- long
  * enough for the browser to follow the redirect, not long enough to pass on.
+ * `download: true` forces Content-Disposition: attachment so a polyglot is
+ * saved, not inlined as HTML if a browser sniffed the bytes.
  *
  * Layouts do not wrap route handlers, so every check the page's layout would
  * have made is repeated here explicitly.
@@ -62,7 +64,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: signed, error } = await admin.storage
     .from("resumes")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, { download: true });
   if (error || !signed?.signedUrl) {
     return new NextResponse("Not found", { status: 404 });
   }
