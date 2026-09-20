@@ -36,7 +36,7 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 export type ButtonVariant = "primary" | "ghost" | "danger" | "quiet" | "quietDanger" | "nav";
 
 const BASE =
-  "inline-flex items-center justify-center rounded font-medium disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
