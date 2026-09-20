@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
+import { assertPdf, PDF_CONTENT_TYPE } from "@/lib/files";
 import { notify } from "@/lib/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -31,18 +32,31 @@ async function removeSnapshots(
 }
 
 /**
- * Rejects anything that is not really a PDF.
- *
- * `File.type` is a client-supplied header and the upload below pins
- * `contentType` to that same claim, so without a look at the bytes a member
- * could store an arbitrary payload as `application/pdf` and have a recruiter
- * download it as a cover letter.
+ * Service-role copy bypasses storage RLS. Path prefix is checked again, and
+ * the source bytes are re-validated, so a member who overwrote their package
+ * object via the Storage API after createPackage cannot snapshot HTML/EXE
+ * into an application the recruiter will download.
  */
-async function assertPdf(file: File, label: string) {
-  if (file.type !== "application/pdf") throw new Error(`${label} must be a PDF`);
-  if (file.size > 5 * 1024 * 1024) throw new Error(`${label} must be under 5MB`);
-  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
-  if (String.fromCharCode(...head) !== "%PDF-") throw new Error(`${label} must be a PDF`);
+async function snapshotOwnedPdf(
+  admin: ReturnType<typeof createAdminClient>,
+  sourcePath: string,
+  destPath: string,
+  memberId: string,
+  label: string,
+) {
+  if (!sourcePath.startsWith(`${memberId}/`)) {
+    denyRedirect("/applications", "application_package_path_invalid");
+  }
+  const { data, error } = await admin.storage.from("resumes").download(sourcePath);
+  if (error || !data) throw new Error(error?.message ?? `${label} could not be read`);
+  const buf = await data.arrayBuffer();
+  await assertPdf(new File([buf], "document.pdf"), label);
+  // Upload the validated bytes with a pinned MIME. `copy` would preserve a
+  // spoofed Content-Type the member wrote through the Storage API.
+  const { error: upErr } = await admin.storage.from("resumes").upload(destPath, buf, {
+    contentType: PDF_CONTENT_TYPE,
+  });
+  if (upErr) throw new Error(upErr.message);
 }
 
 const STAGES = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
@@ -57,13 +71,14 @@ export async function applyToJob(formData: FormData) {
   const postId = String(formData.get("post_id"));
   const packageId = String(formData.get("package_id"));
 
+  const feedPath = `/feed/${encodeURIComponent(postId)}`;
   const { data: post, error: postErr } = await supabase
     .from("posts")
     .select("*")
     .eq("id", postId)
     .single();
-  if (postErr || !post) throw new Error("Post not found");
-  if (!isInAppJob(post as Post)) throw new Error("Apply is only allowed on open in-app jobs");
+  if (postErr || !post) denyRedirect("/feed", "application_not_open");
+  if (!isInAppJob(post as Post)) denyRedirect(feedPath, "application_not_open");
 
   const { data: pack, error: packErr } = await supabase
     .from("hiring_packages")
@@ -71,7 +86,7 @@ export async function applyToJob(formData: FormData) {
     .eq("id", packageId)
     .eq("member_id", profile.id)
     .single();
-  if (packErr || !pack) throw new Error("Choose a hiring package");
+  if (packErr || !pack) denyRedirect(feedPath, "application_package_missing");
   if (
     typeof pack.resume_path !== "string" ||
     !pack.resume_path.startsWith(`${profile.id}/`) ||
@@ -103,36 +118,49 @@ export async function applyToJob(formData: FormData) {
     }
   } else if (coverMode === "upload") {
     const file = formData.get("cover_pdf") as File | null;
-    if (!file || file.size === 0) throw new Error("Upload a cover letter PDF");
-    await assertPdf(file, "Cover letter");
+    if (!file || file.size === 0) denyRedirect(feedPath, "application_cover_invalid");
+    try {
+      await assertPdf(file, "Cover letter");
+    } catch {
+      denyRedirect(feedPath, "application_cover_invalid");
+    }
     coverPath = `snapshots/${appId}/cover.pdf`;
     const { error } = await admin.storage.from("resumes").upload(coverPath, file, {
-      contentType: "application/pdf",
+      contentType: PDF_CONTENT_TYPE,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      await removeSnapshots(admin, appId, snapshots);
+      denyRedirect(feedPath, "application_cover_invalid");
+    }
     snapshots.push(coverPath);
     coverLetter = null;
   }
 
   const snapResume = `snapshots/${appId}/resume.pdf`;
-  const { error: copyErr } = await admin.storage
-    .from("resumes")
-    .copy(pack.resume_path, snapResume);
-  if (copyErr) {
+  try {
+    await snapshotOwnedPdf(admin, pack.resume_path, snapResume, profile.id, "Resume");
+  } catch (e) {
     await removeSnapshots(admin, appId, snapshots);
-    throw new Error(copyErr.message);
+    if (isNextRedirect(e)) throw e;
+    denyRedirect(feedPath, "application_package_path_invalid");
   }
   snapshots.push(snapResume);
 
   let snapCover = coverPath;
   if (coverMode === "default" && pack.cover_letter_path) {
     snapCover = `snapshots/${appId}/cover.pdf`;
-    const { error: coverCopyErr } = await admin.storage
-      .from("resumes")
-      .copy(pack.cover_letter_path, snapCover);
-    if (coverCopyErr) {
+    try {
+      await snapshotOwnedPdf(
+        admin,
+        pack.cover_letter_path,
+        snapCover,
+        profile.id,
+        "Cover letter file",
+      );
+    } catch (e) {
       await removeSnapshots(admin, appId, snapshots);
-      throw new Error(coverCopyErr.message);
+      if (isNextRedirect(e)) throw e;
+      denyRedirect(feedPath, "application_package_path_invalid");
     }
     snapshots.push(snapCover);
   }
@@ -167,7 +195,7 @@ export async function applyToJob(formData: FormData) {
         "application_firm_not_accepting",
       );
     }
-    throw new Error(error.message);
+    denyRedirect(feedPath, "application_submit_failed");
   }
   await notify({
     type: "application",
@@ -193,10 +221,19 @@ export async function logOffPlatform(formData: FormData) {
   if (postId) {
     const { data: post, error: postErr } = await supabase
       .from("posts")
-      .select("id")
+      .select("id, kind, external_url")
       .eq("id", postId)
       .maybeSingle();
-    if (postErr || !post) {
+    // Only external listings. Logging against an in-app job id would insert
+    // kind=off_platform and, via applications_one_per_job, permanently block
+    // a later hub apply to that same posting.
+    if (
+      postErr ||
+      !post ||
+      (post.kind !== "job" && post.kind !== "job_link") ||
+      typeof post.external_url !== "string" ||
+      !/^https?:\/\//i.test(post.external_url)
+    ) {
       denyRedirect("/applications", "application_log_post_missing");
     }
   }
@@ -214,7 +251,7 @@ export async function logOffPlatform(formData: FormData) {
     if (error.code === "23505") {
       denyRedirect("/applications", "application_log_duplicate");
     }
-    throw new Error(error.message);
+    denyRedirect("/applications", "application_log_invalid");
   }
   // The post page is where the off-platform form lives, so it is the page that
   // must re-render to show the logged state and hide the form.
@@ -230,12 +267,7 @@ export async function updateApplicationStage(formData: FormData) {
 
   // One target for every refusal in this action, so an admin or recruiter is
   // never dumped on the member page they cannot use.
-  const deniedPath =
-    profile.role === "company_user"
-      ? "/company/applicants"
-      : profile.is_admin
-        ? "/admin/applications"
-        : "/applications";
+  const deniedPath = stageDeniedPath(profile.role, profile.is_admin, formData);
 
   if (!STAGES.includes(stage as (typeof STAGES)[number])) {
     denyRedirect(deniedPath, "stage_invalid");
@@ -247,7 +279,7 @@ export async function updateApplicationStage(formData: FormData) {
     .eq("id", id)
     .select("id");
 
-  if (error) throw new Error(error.message);
+  if (error) denyRedirect(deniedPath, "application_update_failed");
   if (!data?.length) {
     denyRedirect(deniedPath, "application_update_failed");
   }
@@ -260,4 +292,37 @@ export async function updateApplicationStage(formData: FormData) {
 function emptyToNull(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
   return s.length ? s : null;
+}
+
+function isNextRedirect(e: unknown) {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "digest" in e &&
+    String((e as { digest: unknown }).digest).startsWith("NEXT_REDIRECT")
+  );
+}
+
+/** Stage forms live on several pages; never honor an off-site or member URL. */
+function stageDeniedPath(
+  role: string,
+  isAdmin: boolean,
+  formData: FormData,
+): string {
+  const fallback =
+    role === "company_user"
+      ? "/company/applicants"
+      : isAdmin
+        ? "/admin/applications"
+        : "/applications";
+  const raw = String(formData.get("return_to") ?? "").trim().split("?")[0];
+  if (
+    role === "company_user" &&
+    /^\/company\/posts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      raw,
+    )
+  ) {
+    return raw;
+  }
+  return fallback;
 }

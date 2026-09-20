@@ -24,7 +24,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: signed, error } = await admin.storage
     .from("resumes")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, { download: true }); // attachment, not inline
   if (error || !signed?.signedUrl) {
     return new NextResponse("Not found", { status: 404 });
   }

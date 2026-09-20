@@ -49,6 +49,14 @@ const MESSAGES = {
     "That application was not submitted. Keep the cover letter under 4,000 characters, or upload a PDF instead.",
   application_firm_not_accepting:
     "You cannot apply to this listing in the hub.",
+  application_not_open:
+    "That posting is not taking hub applications.",
+  application_package_missing:
+    "Choose a hiring package, then apply again.",
+  application_log_invalid:
+    "That off-platform application was not logged. Add a company name and try again.",
+  application_submit_failed:
+    "That application could not be submitted. Try again in a moment.",
 
   // lib/actions/auth.ts
   login_failed: "Could not log in. Check your email and password and try again.",
@@ -114,6 +122,10 @@ const MESSAGES = {
     "That package was not created — you already have a default package. Uncheck \u201cmake this my default\u201d and try again.",
   package_invalid:
     "That package was not saved. Give it a name and a LinkedIn URL, and keep the cover letter under 4,000 characters.",
+  package_url_invalid:
+    "That LinkedIn URL isn't valid. Use a full http:// or https:// web address.",
+  package_file_invalid:
+    "That resume or cover letter was not saved. Upload a PDF under 5MB.",
 
   // lib/actions/messages.ts
   message_invalid:

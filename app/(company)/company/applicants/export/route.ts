@@ -1,4 +1,5 @@
 import { getCurrentProfile } from "@/lib/auth";
+import { csvCell } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { can, loadMyCompanyTier } from "@/lib/tiers";
@@ -56,10 +57,4 @@ export async function GET() {
       "Cache-Control": "no-store",
     },
   });
-}
-
-function csvCell(value: string | number | null | undefined) {
-  const s = value == null ? "" : String(value);
-  if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
-  return s;
 }
