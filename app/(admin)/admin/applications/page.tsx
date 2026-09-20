@@ -2,6 +2,7 @@ import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { updateApplicationStage } from "@/lib/actions/applications";
 import { createClient } from "@/lib/supabase/server";
+import { QuietButton } from "@/components/Form";
 import type { Application } from "@/lib/types";
 
 const stages = ["submitted", "reviewing", "interviewing", "offer", "closed"] as const;
@@ -30,7 +31,7 @@ export default async function AdminApplicationsPage({
               {" "}
               · {a.kind === "in_app" ? a.posts?.title : a.company_name} · {a.kind}
             </span>
-            <form action={updateApplicationStage} className="mt-2 flex items-center gap-2">
+            <form action={updateApplicationStage} className="mt-3 flex flex-wrap items-center gap-2">
               <input type="hidden" name="id" value={a.id} />
               <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
                 {stages.map((s) => (
@@ -39,7 +40,7 @@ export default async function AdminApplicationsPage({
                   </option>
                 ))}
               </select>
-              <button className="text-xs uppercase tracking-wider text-blue-light">Save</button>
+              <QuietButton type="submit">Save stage</QuietButton>
             </form>
           </li>
         ))}

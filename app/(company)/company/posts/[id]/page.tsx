@@ -7,6 +7,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformJob, kindLabel, type Application, type Post } from "@/lib/types";
+import { QuietButton, buttonClass } from "@/components/Form";
 import { notFound, redirect } from "next/navigation";
 import { isSafeHttpUrl } from "../../talent-query";
 
@@ -52,7 +53,7 @@ export default async function CompanyPostPage({
         <p className="mt-4">
           <a
             href={p.external_url}
-            className="text-xs uppercase tracking-wider text-blue-light"
+            className={buttonClass("ghost")}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -86,10 +87,12 @@ export default async function CompanyPostPage({
                   {a.cover_letter && (
                     <p className="mt-2 whitespace-pre-wrap text-sm text-white/60">{a.cover_letter}</p>
                   )}
-                  <ResumeDocLink applicationId={a.id} path={a.resume_path} doc="resume" />
-                  <ResumeDocLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
-                  <div className="mt-2 flex gap-3">
-                    <form action={updateApplicationStage}>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <ResumeDocLink applicationId={a.id} path={a.resume_path} doc="resume" />
+                    <ResumeDocLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <form action={updateApplicationStage} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="id" value={a.id} />
                       <input type="hidden" name="return_to" value={`/company/posts/${id}`} />
                       <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
@@ -99,9 +102,7 @@ export default async function CompanyPostPage({
                           </option>
                         ))}
                       </select>
-                      <button className="ml-2 text-xs uppercase tracking-wider text-blue-light">
-                        Save
-                      </button>
+                      <QuietButton type="submit">Save stage</QuietButton>
                     </form>
                     {a.member_id && p.company_id && (
                       <LockedAction
@@ -112,9 +113,7 @@ export default async function CompanyPostPage({
                         <form action={startConversation}>
                           <input type="hidden" name="company_id" value={p.company_id} />
                           <input type="hidden" name="member_id" value={a.member_id} />
-                          <button className="text-xs uppercase tracking-wider text-white/50">
-                            Message
-                          </button>
+                          <QuietButton type="submit">Message</QuietButton>
                         </form>
                       </LockedAction>
                     )}

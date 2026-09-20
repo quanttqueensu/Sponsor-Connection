@@ -1,6 +1,6 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
-import { Field, PrimaryButton, TextInput } from "@/components/Form";
+import { Field, PrimaryButton, QuietButton, TextInput } from "@/components/Form";
 import { logOffPlatform, updateApplicationStage } from "@/lib/actions/applications";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -71,7 +71,7 @@ export default async function ApplicationsPage({
                 </span>
               </p>
               {a.kind === "off_platform" && (
-                <form action={updateApplicationStage} className="mt-2 flex items-center gap-2">
+                <form action={updateApplicationStage} className="mt-3 flex flex-wrap items-center gap-2">
                   <input type="hidden" name="id" value={a.id} />
                   <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
                     {stages.map((s) => (
@@ -80,9 +80,7 @@ export default async function ApplicationsPage({
                       </option>
                     ))}
                   </select>
-                  <button className="text-xs uppercase tracking-wider text-blue-light">
-                    Update
-                  </button>
+                  <QuietButton type="submit">Save stage</QuietButton>
                 </form>
               )}
             </li>

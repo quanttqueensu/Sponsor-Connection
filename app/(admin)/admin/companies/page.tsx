@@ -1,7 +1,7 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import CopyLink from "@/components/CopyLink";
-import { Field, GhostButton, PrimaryButton, TextInput } from "@/components/Form";
+import { Field, GhostButton, PrimaryButton, TextInput, buttonClass } from "@/components/Form";
 import { resetCompanyAccess, setCompanyAccess, setCompanyTier } from "@/lib/actions/admin";
 import {
   can,
@@ -48,12 +48,14 @@ export default async function CompaniesPage({
       <PageHeader kicker="Firms" title="Companies">
         Assign a sponsorship level to each firm, then grant or revoke hub features for that firm.
         Company contacts never see the member feed — only their own posts and the products you turn
-        on.{" "}
-        <Link href="/admin/invite?kind=company" className="text-blue-light hover:text-white">
-          Invite a company contact
-        </Link>
+        on.
       </PageHeader>
       <Notice message={sp.denied} />
+      <div className="mb-6">
+        <Link href="/admin/invite?kind=company" className={buttonClass("primary")}>
+          Invite a company contact
+        </Link>
+      </div>
       <div className="mb-10 border border-white/10 p-5">
         <p className="text-[11px] uppercase tracking-[2px] text-white/60">Public signup link</p>
         <p className="mt-2 text-sm text-white/60">

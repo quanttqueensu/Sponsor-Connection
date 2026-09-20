@@ -1,6 +1,7 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import ManualInviteBanner from "@/components/ManualInviteBanner";
+import { DangerButton, PrimaryButton } from "@/components/Form";
 import { readManualInvite, reviewJoinRequest } from "@/lib/actions/admin";
 import { loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
@@ -32,8 +33,8 @@ export default async function RequestsPage({
               {r.contact_name} · {r.contact_email}
             </p>
             {r.note && <p className="mt-2 text-sm text-white/60">{r.note}</p>}
-            <div className="mt-3 flex flex-wrap gap-3">
-              <form action={reviewJoinRequest} className="flex flex-wrap items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <form action={reviewJoinRequest} className="flex flex-wrap items-end gap-3">
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="decision" value="approved" />
                 <select
@@ -50,12 +51,12 @@ export default async function RequestsPage({
                     </option>
                   ))}
                 </select>
-                <button className="text-xs uppercase tracking-wider text-blue-light">Approve</button>
+                <PrimaryButton type="submit">Approve</PrimaryButton>
               </form>
               <form action={reviewJoinRequest}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="decision" value="rejected" />
-                <button className="text-xs uppercase tracking-wider text-white/60">Reject</button>
+                <DangerButton type="submit">Reject</DangerButton>
               </form>
             </div>
           </li>

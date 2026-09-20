@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { login, requestPasswordReset } from "@/lib/actions/auth";
-import { Field, PrimaryButton, TextInput } from "@/components/Form";
+import { Field, GhostButton, PrimaryButton, TextInput } from "@/components/Form";
 import { DENIAL_MESSAGES } from "@/lib/denials";
 
 export default async function LoginPage({
@@ -39,20 +39,17 @@ export default async function LoginPage({
         <Field label="Password">
           <TextInput name="password" type="password" required autoComplete="current-password" />
         </Field>
-        <PrimaryButton type="submit">Log in</PrimaryButton>
+        <PrimaryButton type="submit" className="w-full">
+          Log in
+        </PrimaryButton>
         {/*
           Reuses the email field above. formNoValidate skips the required
           password, which a reset obviously does not need; the action checks
           the email itself.
         */}
-        <button
-          type="submit"
-          formAction={requestPasswordReset}
-          formNoValidate
-          className="text-sm text-white/60 underline underline-offset-4 hover:text-white"
-        >
+        <GhostButton type="submit" formAction={requestPasswordReset} formNoValidate className="w-full">
           Forgot your password?
-        </button>
+        </GhostButton>
       </form>
       <p className="mt-8 text-sm text-white/60">
         Hiring for your firm?{" "}

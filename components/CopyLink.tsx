@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { QuietButton } from "@/components/Form";
 
 export default function CopyLink({
   value,
@@ -14,9 +15,8 @@ export default function CopyLink({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <code className="break-all text-sm text-white/70">{value}</code>
-      <button
+      <QuietButton
         type="button"
-        className="text-xs uppercase tracking-wider text-blue-light"
         onClick={async () => {
           await navigator.clipboard.writeText(value);
           setCopied(true);
@@ -24,7 +24,7 @@ export default function CopyLink({
         }}
       >
         {copied ? "Copied" : label}
-      </button>
+      </QuietButton>
     </div>
   );
 }

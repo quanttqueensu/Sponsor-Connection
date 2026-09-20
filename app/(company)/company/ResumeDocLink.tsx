@@ -1,3 +1,5 @@
+import { buttonClass } from "@/components/Form";
+
 /**
  * Links to one applicant document, without signing anything up front.
  *
@@ -31,7 +33,7 @@ export default function ResumeDocLink({
   return (
     <a
       href={`/company/applications/${applicationId}/resume?doc=${doc}`}
-      className="mt-1 mr-3 inline-block text-xs text-blue-light"
+      className={buttonClass("quiet")}
       target="_blank"
       rel="noopener noreferrer"
     >

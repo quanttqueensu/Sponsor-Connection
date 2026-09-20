@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ButtonHTMLAttributes } from "react";
+import { buttonClass, type ButtonVariant } from "@/components/Form";
 
 /**
  * A submit button that requires an in-page confirmation before the form
@@ -21,8 +22,13 @@ import { useEffect, useId, useRef, type ButtonHTMLAttributes } from "react";
 export default function ConfirmSubmitButton({
   confirmMessage,
   children,
+  variant = "primary",
+  className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { confirmMessage: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  confirmMessage: string;
+  variant?: ButtonVariant;
+}) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -48,7 +54,7 @@ export default function ConfirmSubmitButton({
         {...props}
         ref={buttonRef}
         type="submit"
-        className="inline-flex min-h-11 items-center justify-center rounded bg-primary px-5 py-2.5 text-xs font-medium uppercase tracking-wider text-white hover:bg-primary/80 disabled:opacity-50"
+        className={buttonClass(variant, className)}
         onClick={(e) => {
           e.preventDefault();
           dialogRef.current?.showModal();
@@ -66,18 +72,14 @@ export default function ConfirmSubmitButton({
         </h2>
         <p className="mt-3 text-sm text-white/80">{confirmMessage}</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={confirm}
-            className="inline-flex min-h-11 items-center justify-center rounded bg-primary px-5 py-2.5 text-xs font-medium uppercase tracking-wider text-white hover:bg-primary/80"
-          >
+          <button type="button" onClick={confirm} className={buttonClass(variant)}>
             Yes, continue
           </button>
           <button
             type="button"
             autoFocus
             onClick={() => dialogRef.current?.close()}
-            className="inline-flex min-h-11 items-center justify-center rounded border border-white/15 px-4 py-2 text-xs uppercase tracking-wider text-white/70 hover:border-white/30 hover:text-white"
+            className={buttonClass("ghost")}
           >
             Cancel
           </button>

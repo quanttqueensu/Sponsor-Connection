@@ -53,8 +53,11 @@ export default function InviteForm({
                 key={option.id}
                 type="button"
                 onClick={() => setKind(option.id)}
-                className={`border p-4 text-left ${
-                  selected ? "border-blue-light bg-white/5" : "border-white/10 hover:border-white/20"
+                aria-pressed={selected}
+                className={`cursor-pointer border p-4 text-left ${
+                  selected
+                    ? "border-blue-light bg-white/5"
+                    : "border-white/20 hover:border-white/40 hover:bg-white/[0.04]"
                 }`}
               >
                 <p className="font-heading text-base font-bold text-white">{option.title}</p>

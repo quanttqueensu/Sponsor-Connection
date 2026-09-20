@@ -1,4 +1,5 @@
 import PageHeader from "@/components/PageHeader";
+import { PrimaryButton, buttonClass } from "@/components/Form";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
@@ -67,7 +68,7 @@ export default async function MembersPage({
         {total > 0 && `${total} member${total === 1 ? "" : "s"}`}
       </PageHeader>
 
-      <form method="get" className="mb-8 flex max-w-md gap-2">
+      <form method="get" className="mb-8 flex max-w-md items-stretch gap-2">
         <input
           type="search"
           name="q"
@@ -76,9 +77,7 @@ export default async function MembersPage({
           maxLength={80}
           className="w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40"
         />
-        <button className="border border-white/10 px-4 text-xs uppercase tracking-wider text-white/70 hover:text-white">
-          Search
-        </button>
+        <PrimaryButton type="submit">Search</PrimaryButton>
       </form>
 
       {membersError ? (
@@ -118,23 +117,23 @@ export default async function MembersPage({
       )}
 
       {(hasPrev || hasNext) && (
-        <nav className="mt-8 flex items-center justify-between text-xs uppercase tracking-wider">
+        <nav className="mt-8 flex items-center justify-between gap-3">
           {hasPrev ? (
-            <Link href={pageHref(q, page - 1)} className="text-white/70 hover:text-white">
-              ← Previous
+            <Link href={pageHref(q, page - 1)} className={buttonClass("quiet")}>
+              Previous
             </Link>
           ) : (
-            <span className="text-white/25">← Previous</span>
+            <span className={buttonClass("quiet", "pointer-events-none opacity-40")}>Previous</span>
           )}
-          <span className="text-white/40">
+          <span className="text-xs text-white/50">
             Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
           </span>
           {hasNext ? (
-            <Link href={pageHref(q, page + 1)} className="text-white/70 hover:text-white">
-              Next →
+            <Link href={pageHref(q, page + 1)} className={buttonClass("quiet")}>
+              Next
             </Link>
           ) : (
-            <span className="text-white/25">Next →</span>
+            <span className={buttonClass("quiet", "pointer-events-none opacity-40")}>Next</span>
           )}
         </nav>
       )}

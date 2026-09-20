@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buttonClass } from "@/components/Form";
 
 export default function NotFound() {
   return (
@@ -8,10 +9,7 @@ export default function NotFound() {
       <p className="mt-4 text-sm text-white/60">
         That page doesn&apos;t exist, or you don&apos;t have access to it.
       </p>
-      <Link
-        href="/"
-        className="mt-8 inline-block rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
-      >
+      <Link href="/" className={buttonClass("primary", "mt-8")}>
         Go home
       </Link>
     </div>
