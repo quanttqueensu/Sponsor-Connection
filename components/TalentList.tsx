@@ -2,7 +2,6 @@ import { startConversation } from "@/lib/actions/messages";
 import LockedAction from "@/components/LockedAction";
 import type { CapabilityKey, TierWithCaps } from "@/lib/tiers";
 import { can } from "@/lib/tiers";
-import Link from "next/link";
 
 export type TalentRow = {
   id: string;
@@ -105,13 +104,13 @@ export default function TalentList({
 function ExtLink({ href, label }: { href: string | null; label: string }) {
   if (!href || !/^https?:\/\//i.test(href)) return null;
   return (
-    <Link
+    <a
       href={href}
       className="text-xs uppercase tracking-wider text-white/50 hover:text-white"
       target="_blank"
       rel="noopener noreferrer"
     >
       {label}
-    </Link>
+    </a>
   );
 }

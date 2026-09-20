@@ -7,13 +7,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-
-function cleanTerm(raw: string | undefined) {
-  return String(raw ?? "")
-    .replace(/[%_\\]/g, " ")
-    .trim()
-    .slice(0, 80);
-}
+import { cleanSearchTerm, parseGradYearParam } from "../talent-query";
 
 export default async function ResumeBookPage({
   searchParams,
@@ -36,17 +30,16 @@ export default async function ResumeBookPage({
     loadTiers(),
   ]);
 
-  const program = cleanTerm(sp.program);
-  const yearRaw = String(sp.year ?? "").trim();
-  const year = yearRaw === "" ? null : Number(yearRaw);
-  const yearOk = year === null || (Number.isInteger(year) && year >= 1900 && year <= 2100);
+  const program = cleanSearchTerm(sp.program);
+  const { yearRaw, year, invalid: yearInvalid } = parseGradYearParam(sp.year);
 
-  const { data: members } = can(access, "resume_book")
-    ? await supabase.rpc("resume_book_list", {
-        p_program: program || null,
-        p_grad_year: yearOk ? year : null,
-      })
-    : { data: [] as TalentRow[] };
+  const { data: members } =
+    can(access, "resume_book") && !yearInvalid
+      ? await supabase.rpc("resume_book_list", {
+          p_program: program || null,
+          p_grad_year: year,
+        })
+      : { data: [] as TalentRow[] };
 
   const delay = access?.resume_book_embargo_hours ?? 0;
 
@@ -72,6 +65,11 @@ export default async function ResumeBookPage({
         {delay > 0 && (
           <p className="mb-6 text-sm text-white/60">
             New opt-ins appear after {delay} hours at your tier.
+          </p>
+        )}
+        {yearInvalid && (
+          <p role="alert" className="mb-6 text-sm text-white/80">
+            Grad year must be a whole number between 1900 and 2100.
           </p>
         )}
         <form method="get" className="mb-8 grid max-w-xl gap-3 md:grid-cols-3">

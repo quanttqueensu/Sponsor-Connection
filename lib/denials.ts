@@ -34,6 +34,8 @@ const MESSAGES = {
     "Your current sponsorship does not include that kind of posting. Choose another type, or ask a QUANTT exec.",
   post_quota_reached:
     "You already have the maximum number of open in-app jobs for your tier. Close one first, or ask a QUANTT exec about upgrading.",
+  post_save_failed:
+    "That post could not be published. Check the details and try again, or ask a QUANTT exec.",
 
   // lib/actions/applications.ts
   application_duplicate: "You've already applied to that job.",

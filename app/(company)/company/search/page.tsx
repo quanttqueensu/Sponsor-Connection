@@ -7,13 +7,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-
-function cleanTerm(raw: string | undefined) {
-  return String(raw ?? "")
-    .replace(/[%_\\]/g, " ")
-    .trim()
-    .slice(0, 80);
-}
+import { cleanSearchTerm, parseGradYearParam } from "../talent-query";
 
 export default async function CandidateSearchPage({
   searchParams,
@@ -36,19 +30,18 @@ export default async function CandidateSearchPage({
     loadTiers(),
   ]);
 
-  const q = cleanTerm(sp.q);
-  const program = cleanTerm(sp.program);
-  const yearRaw = String(sp.year ?? "").trim();
-  const year = yearRaw === "" ? null : Number(yearRaw);
-  const yearOk = year === null || (Number.isInteger(year) && year >= 1900 && year <= 2100);
+  const q = cleanSearchTerm(sp.q);
+  const program = cleanSearchTerm(sp.program);
+  const { yearRaw, year, invalid: yearInvalid } = parseGradYearParam(sp.year);
 
-  const { data: members } = can(access, "candidate_search")
-    ? await supabase.rpc("candidate_search_list", {
-        p_q: q || null,
-        p_program: program || null,
-        p_grad_year: yearOk ? year : null,
-      })
-    : { data: [] as TalentRow[] };
+  const { data: members } =
+    can(access, "candidate_search") && !yearInvalid
+      ? await supabase.rpc("candidate_search_list", {
+          p_q: q || null,
+          p_program: program || null,
+          p_grad_year: year,
+        })
+      : { data: [] as TalentRow[] };
 
   return (
     <>
@@ -69,6 +62,11 @@ export default async function CandidateSearchPage({
               package takes effect.
             </p>
           )}
+        {yearInvalid && (
+          <p role="alert" className="mb-6 text-sm text-white/80">
+            Grad year must be a whole number between 1900 and 2100.
+          </p>
+        )}
         <form method="get" className="mb-8 grid max-w-2xl gap-3 md:grid-cols-4">
           <Field label="Search">
             <TextInput name="q" defaultValue={q} maxLength={80} placeholder="Name or interests" />

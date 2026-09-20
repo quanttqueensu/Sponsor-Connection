@@ -4,9 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { can, loadMyCompanyTier } from "@/lib/tiers";
-import type { PostKind } from "@/lib/types";
+import { can, capValue, loadMyCompanyTier } from "@/lib/tiers";
+import type { PostKind, RoleType, TermSeason } from "@/lib/types";
 import { denyRedirect } from "./deny";
+
+const COMPANY_POST_KINDS: PostKind[] = ["job", "job_link", "event", "announcement"];
+const ADMIN_POST_KINDS: PostKind[] = ["job", "job_link", "event", "announcement", "connection"];
+const ROLE_TYPES: RoleType[] = ["full_time", "internship", "coop"];
+const TERM_SEASONS: TermSeason[] = ["fall", "winter", "summer"];
 
 export async function createPost(formData: FormData) {
   const profile = await requireProfile();
@@ -24,11 +29,13 @@ export async function createPost(formData: FormData) {
       .single();
     companyId = data?.company_id ?? null;
     if (!companyId) throw new Error("No company on this account");
-    if (!["job", "job_link", "event", "announcement"].includes(kind)) {
-      throw new Error("Companies cannot create that post type");
+    if (!COMPANY_POST_KINDS.includes(kind)) {
+      denyRedirect(postFormPath, "post_kind_forbidden");
     }
   } else if (!profile.is_admin) {
     throw new Error("Only companies and admins can post");
+  } else if (!ADMIN_POST_KINDS.includes(kind)) {
+    denyRedirect(postFormPath, "post_invalid");
   }
 
   // Validated only after authorization: a plain member forging this call must
@@ -38,6 +45,9 @@ export async function createPost(formData: FormData) {
     denyRedirect(postFormPath, "post_url_invalid");
   }
   const externalUrl = parsedUrl;
+  if (externalUrl && externalUrl.length > MAX_POST_URL) {
+    denyRedirect(postFormPath, "post_url_invalid");
+  }
 
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
@@ -52,9 +62,9 @@ export async function createPost(formData: FormData) {
     denyRedirect(postFormPath, "post_invalid");
   }
 
-  const roleType = emptyToNull(formData.get("role_type"));
-  const termSeason = emptyToNull(formData.get("term_season"));
-  const termYear = Number(formData.get("term_year")) || null;
+  const roleType = parseEnum(formData.get("role_type"), ROLE_TYPES);
+  const termSeason = parseEnum(formData.get("term_season"), TERM_SEASONS);
+  const termYear = parseTermYear(formData.get("term_year"));
 
   const isInApp = kind === "job" && !externalUrl;
   if (isInApp && (!roleType || !termSeason || !termYear)) {
@@ -67,6 +77,36 @@ export async function createPost(formData: FormData) {
     denyRedirect(postFormPath, "post_job_link_url_required");
   }
 
+  const startsAt = kind === "event" ? emptyToNull(formData.get("starts_at")) : null;
+  if (startsAt && Number.isNaN(Date.parse(startsAt))) {
+    denyRedirect(postFormPath, "post_invalid");
+  }
+
+  if (profile.role === "company_user" && companyId) {
+    const { access } = await loadMyCompanyTier(companyId);
+    if (kind === "event" && !can(access, "post_event")) {
+      denyRedirect(postFormPath, "post_kind_forbidden");
+    }
+    if (isInApp) {
+      if (!can(access, "post_in_app_job")) {
+        denyRedirect(postFormPath, "post_kind_forbidden");
+      }
+      const quota = capValue(access, "post_in_app_job");
+      if (quota != null) {
+        const { count } = await supabase
+          .from("posts")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", companyId)
+          .eq("kind", "job")
+          .is("external_url", null)
+          .eq("status", "open");
+        if ((count ?? 0) >= quota) {
+          denyRedirect(postFormPath, "post_quota_reached");
+        }
+      }
+    }
+  }
+
   const { error } = await supabase.from("posts").insert({
     author_id: profile.id,
     company_id: companyId,
@@ -74,7 +114,7 @@ export async function createPost(formData: FormData) {
     title,
     body,
     location,
-    starts_at: emptyToNull(formData.get("starts_at")),
+    starts_at: startsAt,
     published: true,
     status: "open",
     role_type: isInApp ? roleType : null,
@@ -83,17 +123,13 @@ export async function createPost(formData: FormData) {
     external_url: kind === "job_link" || kind === "job" ? externalUrl : null,
   });
   if (error) {
-    if (profile.role === "company_user" && companyId) {
-      if (kind === "event") denyRedirect(postFormPath, "post_kind_forbidden");
-      if (isInApp) {
-        const { access } = await loadMyCompanyTier(companyId);
-        if (!can(access, "post_in_app_job")) {
-          denyRedirect(postFormPath, "post_kind_forbidden");
-        }
-        denyRedirect(postFormPath, "post_quota_reached");
-      }
+    // Pre-checks already mapped capability/quota. A remaining in-app insert
+    // failure is almost always a quota race; anything else is a save failure.
+    // Never surface Postgres/RLS text in the hub chrome.
+    if (profile.role === "company_user" && isInApp) {
+      denyRedirect(postFormPath, "post_quota_reached");
     }
-    throw new Error(error.message);
+    denyRedirect(postFormPath, "post_save_failed");
   }
   revalidatePath("/feed");
   revalidatePath("/company");
@@ -121,7 +157,7 @@ export async function addComment(formData: FormData) {
     author_id: profile.id,
     body,
   });
-  if (error) throw new Error(error.message);
+  if (error) denyRedirect(`/feed/${encodeURIComponent(postId)}`, "comment_invalid");
   revalidatePath(`/feed/${postId}`);
 }
 
@@ -153,9 +189,23 @@ const MAX_COMMENT_BODY = 4000;
 const MAX_POST_TITLE = 200;
 const MAX_POST_BODY = 8000;
 const MAX_POST_LOCATION = 120;
+const MAX_POST_URL = 500;
 
 function overLimit(v: string | null, max: number) {
   return v !== null && v.length > max;
+}
+
+function parseEnum<T extends string>(v: FormDataEntryValue | null, allowed: readonly T[]): T | null {
+  const s = emptyToNull(v);
+  return s && (allowed as readonly string[]).includes(s) ? (s as T) : null;
+}
+
+function parseTermYear(v: FormDataEntryValue | null) {
+  const s = String(v ?? "").trim();
+  if (!/^\d{4}$/.test(s)) return null;
+  const n = Number(s);
+  if (n < 2000 || n > 2100) return null;
+  return n;
 }
 
 function emptyToNull(v: FormDataEntryValue | null) {

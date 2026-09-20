@@ -1,6 +1,7 @@
 import LockedCard from "@/components/LockedCard";
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
+import ResumeDocLink from "../ResumeDocLink";
 import { getCurrentProfile } from "@/lib/auth";
 import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
@@ -75,6 +76,8 @@ export default async function ApplicantsPage({
               <p className="text-sm text-white/60">
                 {a.posts?.title} · {a.stage}
               </p>
+              <ResumeDocLink applicationId={a.id} path={a.resume_path} doc="resume" />
+              <ResumeDocLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
               {a.post_id && (
                 <Link href={`/company/posts/${a.post_id}`} className="text-xs text-blue-light">
                   Open posting

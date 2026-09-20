@@ -129,6 +129,7 @@ export default async function SponsorshipPage({
           <Field label="Website">
             <TextInput
               name="website"
+              type="url"
               defaultValue={company?.website ?? ""}
               maxLength={500}
               placeholder="https://"
@@ -137,6 +138,7 @@ export default async function SponsorshipPage({
           <Field label="Logo URL">
             <TextInput
               name="logo_url"
+              type="url"
               defaultValue={company?.logo_url ?? ""}
               maxLength={500}
               placeholder="https://"
