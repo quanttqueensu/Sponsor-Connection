@@ -84,6 +84,56 @@ export async function seedCompany(
   return data.id as string;
 }
 
+export async function seedDefaultPackage(email: string, memberId: string): Promise<void> {
+  const member = await asUser(email);
+  const { error } = await member.from("hiring_packages").insert({
+    member_id: memberId,
+    name: "Default",
+    linkedin_url: "https://linkedin.com/in/test",
+    resume_path: `${memberId}/packages/x/resume.pdf`,
+    is_default: true,
+  });
+  if (error) throw new Error(`seedDefaultPackage: ${error.message}`);
+}
+
+export async function seedInAppJob(
+  authorId: string,
+  companyId: string,
+  opts: {
+    title?: string;
+    published?: boolean;
+    status?: "open" | "closed";
+    externalUrl?: string | null;
+    kind?: "job" | "job_link" | "event" | "announcement";
+  } = {},
+): Promise<string> {
+  const kind = opts.kind ?? "job";
+  const externalUrl =
+    opts.externalUrl !== undefined
+      ? opts.externalUrl
+      : kind === "job_link"
+        ? "https://acme.example/careers"
+        : null;
+  const { data, error } = await asService()
+    .from("posts")
+    .insert({
+      author_id: authorId,
+      company_id: companyId,
+      kind,
+      title: opts.title ?? "Quant Intern",
+      external_url: externalUrl,
+      role_type: kind === "job" && !externalUrl ? "internship" : null,
+      term_season: kind === "job" && !externalUrl ? "summer" : null,
+      term_year: kind === "job" && !externalUrl ? 2027 : null,
+      published: opts.published ?? true,
+      status: opts.status ?? "open",
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`seedInAppJob: ${error.message}`);
+  return data.id as string;
+}
+
 export async function seedCompanyUser(
   email: string,
   companyId: string,
