@@ -63,6 +63,7 @@ export default async function CompanyHome({
           </li>
         ))}
       </ul>
+      {!(posts ?? []).length && <p className="mt-8 text-sm text-white/60">No posts yet.</p>}
     </>
   );
 }

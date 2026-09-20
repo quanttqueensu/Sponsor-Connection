@@ -3,7 +3,7 @@ import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import PostForm from "@/components/PostForm";
 import { getCurrentProfile } from "@/lib/auth";
-import { can, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
+import { can, capValue, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
 import type { PostKind } from "@/lib/types";
 import { redirect } from "next/navigation";
@@ -29,6 +29,19 @@ export default async function NewCompanyPost({
     loadTiers(),
   ]);
 
+  const quota = capValue(access, "post_in_app_job");
+  const { count: openInApp } = can(access, "post_in_app_job")
+    ? await supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", cu.company_id)
+        .eq("kind", "job")
+        .is("external_url", null)
+        .eq("status", "open")
+    : { count: 0 };
+  const atQuota = quota != null && (openInApp ?? 0) >= quota;
+  const allowInAppJob = can(access, "post_in_app_job") && !atQuota;
+
   const kinds: PostKind[] = ["job", "job_link", "announcement"];
   if (can(access, "post_event")) kinds.splice(2, 0, "event");
 
@@ -47,7 +60,15 @@ export default async function NewCompanyPost({
           />
         </div>
       )}
-      <PostForm kinds={kinds} redirectTo="/company" />
+      {can(access, "post_in_app_job") && quota != null && (
+        <p className="mb-8 text-sm text-white/60">
+          Open in-app jobs: {openInApp ?? 0} / {quota}
+          {atQuota
+            ? ". Close one first to take applications in the hub, or publish a listing with an external URL."
+            : "."}
+        </p>
+      )}
+      <PostForm kinds={kinds} redirectTo="/company" allowInAppJob={allowInAppJob} />
     </>
   );
 }

@@ -8,6 +8,7 @@ import type { PostKind } from "@/lib/types";
 export default function PostForm({
   kinds,
   companies,
+  allowInAppJob = true,
 }: {
   kinds: PostKind[];
   companies?: { id: string; name: string }[];
@@ -18,13 +19,16 @@ export default function PostForm({
    * be dropped once they stop passing it.
    */
   redirectTo?: string;
+  /** False when the firm cannot take hub applications (capability or quota). */
+  allowInAppJob?: boolean;
 }) {
   const [kind, setKind] = useState<PostKind>(kinds[0] ?? "announcement");
   const [externalUrl, setExternalUrl] = useState("");
-  const isInAppJob = kind === "job" && externalUrl.trim() === "";
+  const isInAppJob = kind === "job" && externalUrl.trim() === "" && allowInAppJob;
   const isEvent = kind === "event";
   // job_link_has_url (0001_init.sql:133) rejects a job_link with no URL.
-  const urlRequired = kind === "job_link";
+  // A job without in-app access is the same shape: it must link out.
+  const urlRequired = kind === "job_link" || (kind === "job" && !allowInAppJob);
   // createPost writes external_url only for these kinds; showing the field on
   // an event or announcement would silently discard whatever was typed.
   const showUrl = kind === "job" || kind === "job_link";
@@ -102,7 +106,15 @@ export default function PostForm({
             </select>
           </Field>
           <Field label="Term year">
-            <TextInput name="term_year" type="number" required placeholder="2027" />
+            <TextInput
+              name="term_year"
+              type="number"
+              required
+              placeholder="2027"
+              min={2000}
+              max={2100}
+              step={1}
+            />
           </Field>
         </>
       )}
@@ -114,13 +126,16 @@ export default function PostForm({
             name="external_url"
             type="url"
             required={urlRequired}
+            maxLength={500}
             value={externalUrl}
             onChange={(e) => setExternalUrl(e.target.value)}
           />
           <p className="mt-1 text-xs text-white/60">
-            {urlRequired
-              ? "A job link points members at a listing elsewhere, so it needs a full http:// or https:// address."
-              : "Leave blank to accept applications in the hub. Add a URL to send members to your own careers page instead."}
+            {kind === "job" && !allowInAppJob
+              ? "In-app applications are not available for this post. Add a full http:// or https:// listing URL."
+              : urlRequired
+                ? "A job link points members at a listing elsewhere, so it needs a full http:// or https:// address."
+                : "Leave blank to accept applications in the hub. Add a URL to send members to your own careers page instead."}
           </p>
         </Field>
       )}

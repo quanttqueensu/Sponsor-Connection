@@ -56,8 +56,7 @@ export async function updateCompanyProfile(formData: FormData) {
     .update({ website, logo_url: logoUrl, description })
     .eq("id", cu.company_id)
     .select("id");
-  if (error) throw new Error(error.message);
-  if (!data?.length) denyRedirect("/company/sponsorship", "company_profile_invalid");
+  if (error || !data?.length) denyRedirect("/company/sponsorship", "company_profile_invalid");
   revalidatePath("/company/sponsorship");
   revalidatePath("/feed");
   revalidatePath("/company");
