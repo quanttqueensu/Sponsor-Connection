@@ -7,12 +7,19 @@ import { notify } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import { denyRedirect } from "./deny";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return UUID_RE.test(value);
+}
+
 export async function startConversation(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
-  let companyId = String(formData.get("company_id"));
+  let companyId = String(formData.get("company_id") ?? "");
   const memberId =
-    profile.role === "member" ? profile.id : String(formData.get("member_id"));
+    profile.role === "member" ? profile.id : String(formData.get("member_id") ?? "");
   if (profile.role === "company_user") {
     const { data } = await supabase
       .from("company_users")
@@ -21,6 +28,11 @@ export async function startConversation(formData: FormData) {
       .maybeSingle();
     if (!data) throw new Error("No company on this account");
     companyId = data.company_id;
+  }
+
+  const deniedPath = conversationReturnPath(formData, profile.role);
+  if (!isUuid(companyId) || !isUuid(memberId)) {
+    denyRedirect(deniedPath, "conversation_start_forbidden");
   }
 
   const { data: existing } = await supabase
@@ -53,10 +65,7 @@ export async function startConversation(formData: FormData) {
           );
         }
       }
-      denyRedirect(
-        companyReturnPath(formData, profile.role),
-        "conversation_start_forbidden",
-      );
+      denyRedirect(deniedPath, "conversation_start_forbidden");
     }
     const path =
       profile.role === "company_user"
@@ -75,12 +84,16 @@ const MAX_MESSAGE_BODY = 4000;
 export async function sendMessage(formData: FormData) {
   const profile = await requireProfile();
   const supabase = await createClient();
-  const conversationId = String(formData.get("conversation_id"));
+  const conversationId = String(formData.get("conversation_id") ?? "");
   const body = String(formData.get("body") ?? "").trim();
+  const inboxPath = profile.role === "company_user" ? "/company/messages" : "/messages";
+  if (!isUuid(conversationId)) {
+    denyRedirect(inboxPath, "message_send_failed");
+  }
   const deniedPath =
     profile.role === "company_user"
-      ? `/company/messages/${encodeURIComponent(conversationId)}`
-      : `/messages/${encodeURIComponent(conversationId)}`;
+      ? `/company/messages/${conversationId}`
+      : `/messages/${conversationId}`;
   if (!body || body.length > MAX_MESSAGE_BODY) {
     denyRedirect(deniedPath, "message_invalid");
   }
@@ -89,7 +102,9 @@ export async function sendMessage(formData: FormData) {
     sender_id: profile.id,
     body,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    denyRedirect(deniedPath, "message_send_failed");
+  }
 
   const col =
     profile.role === "company_user" ? "company_last_read_at" : "member_last_read_at";
@@ -102,7 +117,9 @@ export async function sendMessage(formData: FormData) {
     .from("conversations")
     .update({ [col]: new Date().toISOString() })
     .eq("id", conversationId);
-  if (touchErr) throw new Error(touchErr.message);
+  if (touchErr) {
+    denyRedirect(deniedPath, "message_send_failed");
+  }
 
   await notify({
     type: "message",
@@ -111,7 +128,9 @@ export async function sendMessage(formData: FormData) {
     body,
   });
   revalidatePath("/messages");
+  revalidatePath(`/messages/${conversationId}`);
   revalidatePath("/company/messages");
+  revalidatePath(`/company/messages/${conversationId}`);
 }
 
 export async function markRead(conversationId: string) {
@@ -140,13 +159,26 @@ export async function markRead(conversationId: string) {
   }
 }
 
-function companyReturnPath(
-  formData: FormData,
-  role: string,
-) {
-  if (role !== "company_user") return "/feed";
+function conversationReturnPath(formData: FormData, role: string) {
+  if (role !== "company_user") {
+    const dest = String(formData.get("return_to") ?? "");
+    if (
+      (dest === "/feed" || dest.startsWith("/feed/")) &&
+      !dest.includes("//") &&
+      !dest.includes("\\") &&
+      !dest.includes("..")
+    ) {
+      return dest;
+    }
+    return "/feed";
+  }
   const dest = String(formData.get("return_to") ?? "");
-  if (dest.startsWith("/company/") && !dest.includes("//") && !dest.includes("\\")) {
+  if (
+    dest.startsWith("/company/") &&
+    !dest.includes("//") &&
+    !dest.includes("\\") &&
+    !dest.includes("..")
+  ) {
     return dest;
   }
   return "/company/applicants";

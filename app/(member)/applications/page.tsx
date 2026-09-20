@@ -4,7 +4,7 @@ import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { logOffPlatform, updateApplicationStage } from "@/lib/actions/applications";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { applicationKindLabel, stageLabel, type Application } from "@/lib/types";
+import { applicationKindLabel, one, stageLabel, type Application } from "@/lib/types";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -19,11 +19,14 @@ export default async function ApplicationsPage({
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
-  const { data: apps } = await supabase
+  const { data: apps, error: appsError } = await supabase
     .from("applications")
-    .select("*, posts(title, kind)")
+    .select("*, posts(id, title, kind)")
     .eq("member_id", profile.id)
     .order("created_at", { ascending: false });
+  if (appsError) {
+    console.error("applications: query failed", appsError.message);
+  }
 
   const rows = (apps as Application[] | null) ?? [];
 
@@ -31,7 +34,11 @@ export default async function ApplicationsPage({
     <>
       <PageHeader kicker="Pipeline" title="My applications" />
       <Notice message={sp.denied} />
-      {rows.length === 0 && (
+      {appsError ? (
+        <p className="border border-white/10 p-6 text-sm text-white/60">
+          Applications could not be loaded. Try again.
+        </p>
+      ) : rows.length === 0 ? (
         <p className="border border-white/10 p-6 text-sm text-white/60">
           Nothing here yet. Apply to an in-app job from the{" "}
           <Link href="/feed" className="text-blue-light hover:underline">
@@ -40,34 +47,47 @@ export default async function ApplicationsPage({
           and it will appear here, or log an application you made elsewhere using the form
           below.
         </p>
-      )}
+      ) : null}
       <ul className="space-y-4">
-        {rows.map((a) => (
-          <li key={a.id} className="border-t border-white/10 py-4">
-            <p className="text-white">
-              {a.kind === "in_app" ? a.posts?.title : a.company_name}{" "}
-              <span className="text-xs text-white/60">
-                {a.kind === "in_app" && a.package_name
-                  ? a.package_name
-                  : applicationKindLabel(a.kind)}{" "}
-                · {stageLabel(a.stage)}
-              </span>
-            </p>
-            {a.kind === "off_platform" && (
-              <form action={updateApplicationStage} className="mt-2 flex items-center gap-2">
-                <input type="hidden" name="id" value={a.id} />
-                <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
-                  {stages.map((s) => (
-                    <option key={s} value={s}>
-                      {stageLabel(s)}
-                    </option>
-                  ))}
-                </select>
-                <button className="text-xs uppercase tracking-wider text-blue-light">Update</button>
-              </form>
-            )}
-          </li>
-        ))}
+        {rows.map((a) => {
+          const post = one(a.posts);
+          const title =
+            a.kind === "in_app" ? (post?.title ?? "Job posting") : a.company_name;
+          return (
+            <li key={a.id} className="border-t border-white/10 py-4">
+              <p className="text-white">
+                {a.kind === "in_app" && post?.id ? (
+                  <Link href={`/feed/${post.id}`} className="text-white hover:text-blue-light">
+                    {title}
+                  </Link>
+                ) : (
+                  title
+                )}{" "}
+                <span className="text-xs text-white/60">
+                  {a.kind === "in_app" && a.package_name
+                    ? a.package_name
+                    : applicationKindLabel(a.kind)}{" "}
+                  · {stageLabel(a.stage)}
+                </span>
+              </p>
+              {a.kind === "off_platform" && (
+                <form action={updateApplicationStage} className="mt-2 flex items-center gap-2">
+                  <input type="hidden" name="id" value={a.id} />
+                  <select name="stage" defaultValue={a.stage} className="rounded px-2 py-1 text-sm">
+                    {stages.map((s) => (
+                      <option key={s} value={s}>
+                        {stageLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="text-xs uppercase tracking-wider text-blue-light">
+                    Update
+                  </button>
+                </form>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <form action={logOffPlatform} className="mt-12 max-w-md space-y-3">
         <h2 className="font-heading text-lg font-bold text-white">Log an external application</h2>

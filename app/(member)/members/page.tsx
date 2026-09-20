@@ -1,6 +1,5 @@
 import PageHeader from "@/components/PageHeader";
 import { getCurrentProfile } from "@/lib/auth";
-import { signedPhotoUrl } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import Link from "next/link";
@@ -46,17 +45,21 @@ export default async function MembersPage({
     if (term) query = query.or(`full_name.ilike.*${term}*,program.ilike.*${term}*`);
   }
 
-  const { data: members, count } = await query
+  const { data: members, count, error: membersError } = await query
     .order("full_name")
     .range(from, from + PAGE_SIZE - 1);
+  if (membersError) {
+    console.error("members: query failed", membersError.message);
+  }
 
   const rows = (members as MemberCard[] | null) ?? [];
   const total = count ?? 0;
   const hasPrev = page > 1;
   const hasNext = from + rows.length < total;
-  const cards = await Promise.all(
-    rows.map(async (m) => ({ ...m, photoUrl: await signedPhotoUrl(m.photo_path) })),
-  );
+  const cards = rows.map((m) => ({
+    ...m,
+    photoUrl: m.photo_path ? `/members/${m.id}/photo` : null,
+  }));
 
   return (
     <>
@@ -78,7 +81,11 @@ export default async function MembersPage({
         </button>
       </form>
 
-      {rows.length === 0 ? (
+      {membersError ? (
+        <p className="border border-white/10 p-6 text-sm text-white/60">
+          Members could not be loaded. Try again.
+        </p>
+      ) : rows.length === 0 ? (
         <p className="border border-white/10 p-6 text-sm text-white/60">
           {q
             ? `No members match “${q}”. Try a different name or program.`

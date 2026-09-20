@@ -130,6 +130,8 @@ const MESSAGES = {
   // lib/actions/messages.ts
   message_invalid:
     "That message was not sent. Write something first, and keep it under 4,000 characters.",
+  message_send_failed:
+    "That message was not sent. Try again in a moment.",
   conversation_start_forbidden:
     "You do not have permission to start that conversation.",
 

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import HubNav from "@/components/HubNav";
 import { requireCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { one } from "@/lib/types";
 import { redirect } from "next/navigation";
 
 export default async function MemberLayout({ children }: { children: ReactNode }) {
@@ -21,7 +22,9 @@ export default async function MemberLayout({ children }: { children: ReactNode }
     .limit(1, { referencedTable: "messages" });
 
   const unread = (convos ?? []).filter((c) => {
-    const last = (c.messages as { created_at: string }[] | null)?.[0]?.created_at;
+    const last = one(
+      c.messages as { created_at: string } | { created_at: string }[] | null,
+    )?.created_at;
     if (!last) return false;
     return !c.member_last_read_at || last > c.member_last_read_at;
   }).length;
