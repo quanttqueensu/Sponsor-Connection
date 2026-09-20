@@ -102,7 +102,14 @@ export async function updateTier(formData: FormData) {
   const embargo = parseEmbargo(String(formData.get("embargo") ?? ""));
   const bookEmbargo = parseEmbargo(String(formData.get("resume_book_embargo") ?? ""));
   if (!name) denyRedirect("/admin/tiers", "tier_name_required");
-  if (!Number.isInteger(rank) || rank < 0) denyRedirect("/admin/tiers", "tier_rank_invalid");
+  const { data: existing } = await supabase
+    .from("sponsor_tiers")
+    .select("key")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) denyRedirect("/admin/tiers", "tier_save_failed");
+  const minRank = existing.key === "none" ? 0 : 1;
+  if (!Number.isInteger(rank) || rank < minRank) denyRedirect("/admin/tiers", "tier_rank_invalid");
   if (price === undefined) denyRedirect("/admin/tiers", "tier_price_invalid");
   if (embargo === undefined) denyRedirect("/admin/tiers", "tier_embargo_invalid");
   if (bookEmbargo === undefined) denyRedirect("/admin/tiers", "tier_embargo_invalid");

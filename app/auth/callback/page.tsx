@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { markMustSetPassword } from "@/lib/actions/auth";
-import { isPasswordSetupAuthType, parseAuthHash, userNeedsPassword } from "@/lib/auth-session";
+import {
+  authCallbackNeedsPassword,
+  parseAuthHash,
+  userNeedsPassword,
+} from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AuthCallbackPage() {
@@ -26,18 +30,22 @@ export default function AuthCallbackPage() {
           throw new Error("login_link_expired");
         }
 
+        let exchanged = false;
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
+          exchanged = true;
         } else if (token_hash && type) {
           const { error } = await supabase.auth.verifyOtp({ token_hash, type });
           if (error) throw error;
+          exchanged = true;
         } else if (hash.access_token && hash.refresh_token) {
           const { error } = await supabase.auth.setSession({
             access_token: hash.access_token,
             refresh_token: hash.refresh_token,
           });
           if (error) throw error;
+          exchanged = true;
         } else {
           const {
             data: { session },
@@ -50,9 +58,19 @@ export default function AuthCallbackPage() {
         } = await supabase.auth.getUser();
         if (!user) throw new Error("login_link_expired");
 
-        const needsPassword = isPasswordSetupAuthType(type) || userNeedsPassword(user);
-        if (needsPassword) {
-          await markMustSetPassword();
+        const needsPassword = authCallbackNeedsPassword({
+          exchanged,
+          type,
+          next: url.searchParams.get("next"),
+          userMustSetPassword: userNeedsPassword(user),
+        });
+        if (needsPassword && exchanged) {
+          try {
+            await markMustSetPassword();
+          } catch {
+            // Session is already established. Missing service-role metadata
+            // must not throw away a working invite/recovery link.
+          }
         }
 
         window.location.replace(needsPassword ? "/auth/set-password" : "/");

@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { userNeedsPassword } from "@/lib/auth-session";
+import { shouldForwardToAuthCallback, userNeedsPassword } from "@/lib/auth-session";
 
 /**
  * Routes reachable without a session.
@@ -73,6 +73,15 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // Query-string tokens (PKCE `code`, OTP `token_hash`) must reach /auth/callback
+  // even if Site URL is `/`, `/login`, or `/for-companies`. Do this before the
+  // logged-in /login → /feed bounce, which would otherwise depend on client JS.
+  if (shouldForwardToAuthCallback(pathname, request.nextUrl.search, "")) {
+    const redirect = request.nextUrl.clone();
+    redirect.pathname = "/auth/callback";
+    return redirectKeepingSession(redirect, supabaseResponse);
+  }
 
   const { data: profile } = user
     ? await supabase.from("profiles").select("role, is_admin").eq("id", user.id).maybeSingle()
