@@ -80,6 +80,8 @@ const MESSAGES = {
     "Another admin reviewed that request first. The firm and its invite were created anyway — check Companies before approving again.",
   join_request_contact_already_registered:
     "The firm was created and the request approved, but that contact address already has a Hub account, so no invite was sent and their account was not touched. They are not attached to the new firm yet — invite a different contact for the firm, or have them tell an exec which account to link.",
+  join_request_review_failed:
+    "That request could not be reviewed. Refresh and try again, or contact another exec if it keeps failing.",
   invite_email_already_registered:
     "That address already has a Hub account, so no invite was sent and nothing about the account was changed. Ask them to log in — if they cannot get in, they can use “Forgot your password?” on the login page. Re-inviting never changes an existing account's role.",
   invite_failed:

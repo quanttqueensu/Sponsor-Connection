@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseAuthHash, shouldForwardToAuthCallback } from "../lib/auth-session";
+import {
+  authCallbackNeedsPassword,
+  parseAuthHash,
+  safeAuthNext,
+  shouldForwardToAuthCallback,
+} from "../lib/auth-session";
 
 describe("invite / recovery links that miss /auth/callback", () => {
   it("forwards a PKCE code that landed on /login", () => {
@@ -47,5 +52,69 @@ describe("invite / recovery links that miss /auth/callback", () => {
     expect(parsed.access_token).toBe("a");
     expect(parsed.refresh_token).toBe("b");
     expect(parsed.type).toBe("invite");
+  });
+
+  it("forwards a PKCE code that landed on /for-companies or /feed", () => {
+    expect(shouldForwardToAuthCallback("/for-companies", "?code=abc", "")).toBe(true);
+    expect(shouldForwardToAuthCallback("/feed", "?code=abc", "")).toBe(true);
+  });
+});
+
+describe("auth callback next / password-setup detection", () => {
+  it("allowlists only /auth/set-password", () => {
+    expect(safeAuthNext("/auth/set-password")).toBe("/auth/set-password");
+    expect(safeAuthNext("/auth/set-password?x=1")).toBe("/auth/set-password");
+  });
+
+  it("rejects open redirects and relative escapes", () => {
+    expect(safeAuthNext("https://evil.example/phish")).toBeNull();
+    expect(safeAuthNext("//evil.example")).toBeNull();
+    expect(safeAuthNext("/\\evil.example")).toBeNull();
+    expect(safeAuthNext("/feed")).toBeNull();
+    expect(safeAuthNext("/auth/set-password/../../login")).toBeNull();
+  });
+
+  it("sends PKCE recovery (type missing, next=set-password) to set-password", () => {
+    expect(
+      authCallbackNeedsPassword({
+        exchanged: true,
+        type: null,
+        next: "/auth/set-password",
+        userMustSetPassword: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("sends invite/recovery types to set-password after exchange", () => {
+    expect(
+      authCallbackNeedsPassword({
+        exchanged: true,
+        type: "recovery",
+        next: null,
+        userMustSetPassword: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not lock an existing session just because ?type=invite is in the URL", () => {
+    expect(
+      authCallbackNeedsPassword({
+        exchanged: false,
+        type: "invite",
+        next: "/auth/set-password",
+        userMustSetPassword: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("still honors must_set_password on an existing session", () => {
+    expect(
+      authCallbackNeedsPassword({
+        exchanged: false,
+        type: null,
+        next: null,
+        userMustSetPassword: true,
+      }),
+    ).toBe(true);
   });
 });

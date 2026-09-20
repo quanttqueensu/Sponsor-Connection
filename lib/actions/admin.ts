@@ -297,7 +297,7 @@ export async function invitePerson(formData: FormData) {
     profileId = profile.id;
     const kind = String(formData.get("kind") ?? "member");
     const fullName = String(formData.get("full_name") ?? "").trim();
-    if (!email || !fullName) denyRedirect("/admin/invite", "invite_name_email_required");
+    if (!isEmail(email) || !fullName) denyRedirect("/admin/invite", "invite_name_email_required");
     if (kind !== "company" && kind !== "member" && kind !== "admin") {
       denyRedirect("/admin/invite", "invite_kind_invalid");
     }
@@ -390,114 +390,125 @@ export async function reviewJoinRequest(formData: FormData) {
   const id = String(formData.get("id"));
   const decision = String(formData.get("decision"));
   const supabase = await createClient();
-  if (decision === "rejected") {
-    const { data, error } = await supabase
+  try {
+    if (decision === "rejected") {
+      const { data, error } = await supabase
+        .from("company_join_requests")
+        .update({
+          status: "rejected",
+          reviewed_by: profile.id,
+          reviewed_at: new Date().toISOString(),
+          admin_note: emptyToNull(formData.get("admin_note")),
+        })
+        .eq("id", id)
+        .select("id");
+      if (error) denyRedirect("/admin/requests", "join_request_reject_failed");
+      if (!data?.length) {
+        // This update has no status filter, so an already-reviewed row still
+        // matches and returns a row. Zero rows can only mean the request was
+        // deleted, or RLS refused the write.
+        denyRedirect("/admin/requests", "join_request_reject_failed");
+      }
+      revalidatePath("/admin/requests");
+      return;
+    }
+
+    if (decision !== "approved") {
+      denyRedirect("/admin/requests", "join_request_review_failed");
+    }
+
+    const { data: req } = await supabase
+      .from("company_join_requests")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (!req) denyRedirect("/admin/requests", "join_request_review_failed");
+    if (req.status !== "pending") {
+      denyRedirect("/admin/requests", "join_request_review_race");
+    }
+
+    const admin = createAdminClient();
+    const tierId = emptyToNull(formData.get("sponsor_tier_id"));
+    if (!tierId) denyRedirect("/admin/requests", "invite_tier_required");
+    const { data: company, error: cErr } = await admin
+      .from("companies")
+      .insert({
+        name: req.company_name,
+        slug: slugify(req.company_name) + "-" + crypto.randomUUID().slice(0, 4),
+        sponsor_tier_id: tierId,
+        website: req.website,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (cErr || !company) denyRedirect("/admin/requests", "join_request_review_failed");
+
+    const { data: inviteRow, error: inviteRowErr } = await admin
+      .from("invites")
+      .insert({
+        email: req.contact_email,
+        full_name: req.contact_name,
+        role: "company_user",
+        company_id: company.id,
+        invited_by: profile.id,
+      })
+      .select("id")
+      .maybeSingle();
+    if (inviteRowErr && !isUniqueViolation(inviteRowErr.message, inviteRowErr.code)) {
+      denyRedirect("/admin/requests", "join_request_review_failed");
+    }
+
+    let invite: InviteResult | null = null;
+    try {
+      invite = await sendAuthInvite(admin, req.contact_email);
+    } catch (e) {
+      if (!(e instanceof AlreadyRegisteredError)) throw e;
+      // The contact already has an account, so there is nothing to invite and
+      // certainly nothing to reset. Drop the invite row this call just added so
+      // it does not sit in "Waiting to join" forever waiting for a signup that
+      // can never happen, and say so below.
+      if (inviteRow?.id) {
+        await admin
+          .from("invites")
+          .delete()
+          .eq("id", inviteRow.id)
+          .then(undefined, () => undefined);
+      }
+    }
+    if (invite?.via === "manual") {
+      await stashManualInvite(req.contact_email, invite.password, profile.id);
+    }
+
+    const { data: approved, error: updErr } = await admin
       .from("company_join_requests")
       .update({
-        status: "rejected",
+        status: "approved",
         reviewed_by: profile.id,
         reviewed_at: new Date().toISOString(),
-        admin_note: emptyToNull(formData.get("admin_note")),
+        company_id: company.id,
       })
       .eq("id", id)
+      .eq("status", "pending")
       .select("id");
-    if (error) throw new Error(error.message);
-    if (!data?.length) {
-      // This update has no status filter, so an already-reviewed row still
-      // matches and returns a row. Zero rows can only mean the request was
-      // deleted, or RLS refused the write.
-      denyRedirect("/admin/requests", "join_request_reject_failed");
-    }
+    if (updErr) denyRedirect("/admin/requests", "join_request_review_failed");
     revalidatePath("/admin/requests");
-    return;
-  }
-
-  const { data: req } = await supabase
-    .from("company_join_requests")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (!req) throw new Error("Request not found");
-  if (req.status !== "pending") throw new Error("Request already reviewed");
-
-  const admin = createAdminClient();
-  const tierId = emptyToNull(formData.get("sponsor_tier_id"));
-  if (!tierId) denyRedirect("/admin/requests", "invite_tier_required");
-  const { data: company, error: cErr } = await admin
-    .from("companies")
-    .insert({
-      name: req.company_name,
-      slug: slugify(req.company_name) + "-" + crypto.randomUUID().slice(0, 4),
-      sponsor_tier_id: tierId,
-      website: req.website,
-      status: "active",
-    })
-    .select("id")
-    .single();
-  if (cErr) throw new Error(cErr.message);
-
-  const { data: inviteRow, error: inviteRowErr } = await admin
-    .from("invites")
-    .insert({
-      email: req.contact_email,
-      full_name: req.contact_name,
-      role: "company_user",
-      company_id: company.id,
-      invited_by: profile.id,
-    })
-    .select("id")
-    .maybeSingle();
-  if (inviteRowErr && !isUniqueViolation(inviteRowErr.message, inviteRowErr.code)) {
-    throw new Error(inviteRowErr.message);
-  }
-
-  let invite: InviteResult | null = null;
-  try {
-    invite = await sendAuthInvite(admin, req.contact_email);
-  } catch (e) {
-    if (!(e instanceof AlreadyRegisteredError)) throw e;
-    // The contact already has an account, so there is nothing to invite and
-    // certainly nothing to reset. Drop the invite row this call just added so
-    // it does not sit in "Waiting to join" forever waiting for a signup that
-    // can never happen, and say so below.
-    if (inviteRow?.id) {
-      await admin
-        .from("invites")
-        .delete()
-        .eq("id", inviteRow.id)
-        .then(undefined, () => undefined);
+    revalidatePath("/admin/companies");
+    revalidatePath("/admin/invite");
+    // The .eq("status", "pending") filter means zero rows here is a race: another
+    // admin reviewed this request between the check above and now. The firm and
+    // the invite were still created, so say so rather than reporting success.
+    if (!approved?.length) {
+      denyRedirect("/admin/requests", "join_request_review_race");
     }
-  }
-  if (invite?.via === "manual") {
-    await stashManualInvite(req.contact_email, invite.password, profile.id);
-  }
-
-  const { data: approved, error: updErr } = await admin
-    .from("company_join_requests")
-    .update({
-      status: "approved",
-      reviewed_by: profile.id,
-      reviewed_at: new Date().toISOString(),
-      company_id: company.id,
-    })
-    .eq("id", id)
-    .eq("status", "pending")
-    .select("id");
-  if (updErr) throw new Error(updErr.message);
-  revalidatePath("/admin/requests");
-  revalidatePath("/admin/companies");
-  revalidatePath("/admin/invite");
-  // The .eq("status", "pending") filter means zero rows here is a race: another
-  // admin reviewed this request between the check above and now. The firm and
-  // the invite were still created, so say so rather than reporting success.
-  if (!approved?.length) {
-    denyRedirect("/admin/requests", "join_request_review_race");
-  }
-  if (!invite) {
-    denyRedirect("/admin/requests", "join_request_contact_already_registered");
-  }
-  if (invite.via === "manual") {
-    redirect("/admin/invite?manual=1");
+    if (!invite) {
+      denyRedirect("/admin/requests", "join_request_contact_already_registered");
+    }
+    if (invite.via === "manual") {
+      redirect("/admin/invite?manual=1");
+    }
+  } catch (e) {
+    if (isControlFlowError(e)) throw e;
+    denyRedirect("/admin/requests", "join_request_review_failed");
   }
 }
 

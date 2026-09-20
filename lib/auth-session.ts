@@ -40,3 +40,46 @@ export function shouldForwardToAuthCallback(
   if (parsed.error) return true;
   return Boolean(parsed.access_token && parsed.refresh_token);
 }
+
+const AUTH_NEXT_ALLOWLIST = new Set(["/auth/set-password"]);
+
+/**
+ * `authCallbackUrl()` puts `next=` on the invite/recovery lander. Callback
+ * must never honor an absolute or off-allowlist value — that would be an
+ * open redirect. The only destination we currently send is set-password.
+ */
+export function safeAuthNext(next: string | null | undefined): string | null {
+  if (!next) return null;
+  const trimmed = next.trim();
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("://")
+  ) {
+    return null;
+  }
+  const path = trimmed.split("?")[0].split("#")[0];
+  if (path.includes("..") || path.includes("/.")) return null;
+  return AUTH_NEXT_ALLOWLIST.has(path) ? path : null;
+}
+
+/**
+ * After exchanging an invite/recovery link, send the user to set a password.
+ *
+ * PKCE recovery links often have no `type=` after the code exchange — only
+ * the `next=/auth/set-password` we put on redirectTo. Do not treat a bare
+ * `?type=invite` on an existing session as setup: that would let anyone
+ * lock a signed-in user into the password form.
+ */
+export function authCallbackNeedsPassword(input: {
+  exchanged: boolean;
+  type: string | null | undefined;
+  next: string | null | undefined;
+  userMustSetPassword: boolean;
+}): boolean {
+  if (input.userMustSetPassword) return true;
+  if (!input.exchanged) return false;
+  if (isPasswordSetupAuthType(input.type)) return true;
+  return safeAuthNext(input.next) === "/auth/set-password";
+}
