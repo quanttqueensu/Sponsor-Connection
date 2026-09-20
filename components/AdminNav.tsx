@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
+import { buttonClass } from "@/components/Form";
 
 const LINKS = [
   { href: "/admin/invite", label: "Invite" },
@@ -50,20 +51,16 @@ export default function AdminNav() {
               </Link>
             );
           })}
-          <Link
-            href="/feed"
-            className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
-          >
-            Club
-          </Link>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
-            >
-              Log out
-            </button>
-          </form>
+          <div className="ml-1 flex shrink-0 items-center gap-2 border-l border-white/15 pl-4">
+            <Link href="/feed" className={buttonClass("nav")}>
+              Club
+            </Link>
+            <form action={logout}>
+              <button type="submit" className={buttonClass("nav")}>
+                Log out
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </nav>

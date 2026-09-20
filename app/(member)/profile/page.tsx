@@ -1,7 +1,7 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
-import { Field, PrimaryButton, TextArea, TextInput } from "@/components/Form";
+import { Field, PrimaryButton, QuietDangerButton, TextArea, TextInput } from "@/components/Form";
 import {
   addSection,
   deleteSection,
@@ -59,7 +59,7 @@ export default async function ProfilePage({
         <Field label="Photo">
           <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" />
         </Field>
-        <PrimaryButton type="submit">Upload</PrimaryButton>
+        <PrimaryButton type="submit">Upload photo</PrimaryButton>
       </form>
       <form action={updateProfile} className="grid max-w-xl gap-4">
         <Field label="Name">
@@ -106,9 +106,7 @@ export default async function ProfilePage({
               </div>
               <form action={deleteSection}>
                 <input type="hidden" name="id" value={s.id} />
-                <button className="text-xs uppercase tracking-wider text-white/60 hover:text-white">
-                  Delete
-                </button>
+                <QuietDangerButton type="submit">Remove section</QuietDangerButton>
               </form>
             </div>
           </li>
@@ -163,11 +161,14 @@ export default async function ProfilePage({
             value={profile.resume_book_opt_in ? "false" : "true"}
           />
           {profile.resume_book_opt_in ? (
-            <ConfirmSubmitButton confirmMessage="Withdraw from the resume book? Sponsors will no longer be able to see your profile there.">
+            <ConfirmSubmitButton
+              variant="danger"
+              confirmMessage="Withdraw from the resume book? Sponsors will no longer be able to see your profile there."
+            >
               Withdraw from the resume book
             </ConfirmSubmitButton>
           ) : (
-            <PrimaryButton type="submit">Opt in</PrimaryButton>
+            <PrimaryButton type="submit">Opt in to resume book</PrimaryButton>
           )}
         </form>
       </section>

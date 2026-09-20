@@ -1,4 +1,5 @@
 import { can, lowestTierWith, type CapabilityKey, type TierWithCaps } from "@/lib/tiers";
+import { buttonClass } from "@/components/Form";
 import type { ReactNode } from "react";
 
 export default function LockedCard({
@@ -29,7 +30,7 @@ export default function LockedCard({
       </p>
       <a
         href="mailto:sponsors@quantt.ca?subject=QUANTT%20sponsorship"
-        className="mt-4 inline-block rounded border border-blue-light/40 px-4 py-2 text-xs uppercase tracking-wider text-blue-light"
+        className={buttonClass("ghost", "mt-4")}
       >
         Talk to QUANTT
       </a>

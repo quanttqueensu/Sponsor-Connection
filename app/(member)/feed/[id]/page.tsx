@@ -14,7 +14,7 @@ import {
   type Post,
   type PostComment,
 } from "@/lib/types";
-import { Field, PrimaryButton, TextArea } from "@/components/Form";
+import { Field, GhostButton, PrimaryButton, TextArea, buttonClass } from "@/components/Form";
 import Notice from "@/components/Notice";
 import TierBadge from "@/components/TierBadge";
 import { notFound } from "next/navigation";
@@ -136,9 +136,7 @@ export default async function PostDetailPage({
           <form action={startConversation}>
             <input type="hidden" name="company_id" value={p.company_id} />
             <input type="hidden" name="return_to" value={`/feed/${p.id}`} />
-            <button className="rounded border border-white/15 px-4 py-2 text-xs uppercase tracking-wider text-white/70">
-              Message
-            </button>
+            <GhostButton type="submit">Message</GhostButton>
           </form>
         )}
         {listingUrl && (
@@ -146,7 +144,7 @@ export default async function PostDetailPage({
             href={listingUrl}
             target="_blank"
             rel="noreferrer"
-            className="rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
+            className={buttonClass("primary")}
           >
             Open listing
           </a>
@@ -180,7 +178,7 @@ export default async function PostDetailPage({
             This posting is closed, so applications are no longer being accepted here.
             {existingApp ? " Your application is still in your applications list." : ""}
           </p>
-          <Link href="/feed" className="mt-4 inline-block text-sm text-blue-light">
+          <Link href="/feed" className={buttonClass("ghost", "mt-4")}>
             Browse open postings
           </Link>
         </section>
@@ -205,10 +203,7 @@ export default async function PostDetailPage({
                 A hiring package bundles your resume, LinkedIn, and an optional cover
                 letter so you can apply in one click. You need one before applying.
               </p>
-              <Link
-                href="/packages"
-                className="mt-4 inline-block rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
-              >
+              <Link href="/packages" className={buttonClass("primary", "mt-4")}>
                 Create a hiring package
               </Link>
             </div>

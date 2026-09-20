@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
+import { buttonClass } from "@/components/Form";
 import type { Profile } from "@/lib/types";
 
 type Props = {
@@ -85,11 +86,8 @@ export default function HubNav({ profile, unread = 0, companyCaps }: Props) {
               </Link>
             );
           })}
-          <form action={logout}>
-            <button
-              type="submit"
-              className="text-[11px] uppercase tracking-[1px] text-white/60 hover:text-white"
-            >
+          <form action={logout} className="ml-1 shrink-0 border-l border-white/15 pl-4">
+            <button type="submit" className={buttonClass("nav")}>
               Log out
             </button>
           </form>

@@ -1,6 +1,7 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import PostCard from "@/components/PostCard";
+import { PrimaryButton, buttonClass } from "@/components/Form";
 import { createClient } from "@/lib/supabase/server";
 import { kindLabel, roleTypeLabel, type Post, type PostKind, type RoleType } from "@/lib/types";
 import Link from "next/link";
@@ -183,17 +184,9 @@ export default async function FeedPage({
           />
           Sponsors only
         </label>
-        <button
-          type="submit"
-          className="min-h-11 rounded bg-primary px-4 py-2 text-xs uppercase tracking-wider text-white"
-        >
-          Filter
-        </button>
+        <PrimaryButton type="submit">Filter</PrimaryButton>
         {hasFilters && (
-          <Link
-            href="/feed"
-            className="inline-flex min-h-11 items-center justify-center rounded border border-white/15 px-4 py-2 text-xs uppercase tracking-wider text-white/70 hover:border-white/30 hover:text-white"
-          >
+          <Link href="/feed" className={buttonClass("ghost")}>
             Clear filters
           </Link>
         )}
@@ -216,21 +209,21 @@ export default async function FeedPage({
       </div>
 
       {(page > 1 || hasNext) && (
-        <nav aria-label="Feed pages" className="mt-8 flex items-center gap-4 text-sm">
+        <nav aria-label="Feed pages" className="mt-8 flex items-center gap-3 text-sm">
           {page > 1 ? (
-            <Link href={feedHref(sp, page - 1)} className="text-blue-light">
-              ← Newer
+            <Link href={feedHref(sp, page - 1)} className={buttonClass("quiet")}>
+              Newer
             </Link>
           ) : (
-            <span className="text-white/30">← Newer</span>
+            <span className={buttonClass("quiet", "pointer-events-none opacity-40")}>Newer</span>
           )}
           <span className="text-white/50">Page {page}</span>
           {hasNext ? (
-            <Link href={feedHref(sp, page + 1)} className="text-blue-light">
-              Older →
+            <Link href={feedHref(sp, page + 1)} className={buttonClass("quiet")}>
+              Older
             </Link>
           ) : (
-            <span className="text-white/30">Older →</span>
+            <span className={buttonClass("quiet", "pointer-events-none opacity-40")}>Older</span>
           )}
         </nav>
       )}

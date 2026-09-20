@@ -1,6 +1,7 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import PostForm from "@/components/PostForm";
+import { buttonClass } from "@/components/Form";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
@@ -20,12 +21,14 @@ export default async function AdminNewPost({
   return (
     <>
       <PageHeader kicker="Feed" title="New post">
-        Members will see this on the global feed. Companies only see it if you attach their firm.{" "}
-        <Link href="/admin/posts" className="text-blue-light hover:text-white">
-          Back to all posts
-        </Link>
+        Members will see this on the global feed. Companies only see it if you attach their firm.
       </PageHeader>
       <Notice message={sp.denied} />
+      <div className="mb-6">
+        <Link href="/admin/posts" className={buttonClass("ghost")}>
+          Back to all posts
+        </Link>
+      </div>
       <PostForm
         kinds={["job", "job_link", "event", "announcement", "connection"]}
         companies={companies ?? []}

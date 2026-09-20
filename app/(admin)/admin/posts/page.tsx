@@ -1,5 +1,6 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
+import { QuietDangerButton, buttonClass } from "@/components/Form";
 import { closePost } from "@/lib/actions/posts";
 import { createClient } from "@/lib/supabase/server";
 import type { Post } from "@/lib/types";
@@ -23,12 +24,14 @@ export default async function AdminPostsPage({
   return (
     <>
       <PageHeader kicker="Feed" title="Posts">
-        Everything on the club feed, newest first.{" "}
-        <Link href="/admin/posts/new" className="text-blue-light hover:text-white">
-          Write a new post
-        </Link>
+        Everything on the club feed, newest first.
       </PageHeader>
       <Notice message={sp.denied} />
+      <div className="mb-6">
+        <Link href="/admin/posts/new" className={buttonClass("primary")}>
+          Write a new post
+        </Link>
+      </div>
       <ul>
         {(posts as PostRow[] | null)?.map((p) => {
           const company = one(p.companies);
@@ -47,9 +50,7 @@ export default async function AdminPostsPage({
               {p.status === "open" && (
                 <form action={closePost}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button className="text-xs uppercase tracking-wider text-blue-light hover:text-white">
-                    Close
-                  </button>
+                  <QuietDangerButton type="submit">Close posting</QuietDangerButton>
                 </form>
               )}
             </li>

@@ -2,7 +2,7 @@ import LockedCard from "@/components/LockedCard";
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import TalentList, { type TalentRow } from "@/components/TalentList";
-import { Field, TextInput } from "@/components/Form";
+import { Field, PrimaryButton, TextInput } from "@/components/Form";
 import { getCurrentProfile } from "@/lib/auth";
 import { can, graceOnlyCap, loadMyCompanyTier, loadTiers } from "@/lib/tiers";
 import { createClient } from "@/lib/supabase/server";
@@ -78,9 +78,7 @@ export default async function CandidateSearchPage({
             <TextInput name="year" type="number" defaultValue={yearRaw} />
           </Field>
           <div className="flex items-end">
-            <button className="rounded bg-primary px-4 py-2 text-xs uppercase tracking-wider text-white">
-              Search
-            </button>
+            <PrimaryButton type="submit">Search</PrimaryButton>
           </div>
         </form>
         <TalentList

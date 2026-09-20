@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { GhostButton, buttonClass } from "@/components/Form";
 
 /**
  * `reset()` only re-renders the failed segment. These are Server Component
@@ -45,19 +46,13 @@ export default function Error({
       {error.digest && (
         <p className="mt-2 text-xs text-white/60">Reference: {error.digest}</p>
       )}
-      <div className="mt-8 flex items-center gap-4">
-        <Link
-          href={home.href}
-          className="rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
-        >
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        <Link href={home.href} className={buttonClass("primary")}>
           Go to {home.label}
         </Link>
-        <button
-          onClick={reset}
-          className="text-xs uppercase tracking-wider text-blue-light hover:text-white"
-        >
+        <GhostButton type="button" onClick={reset}>
           Try again
-        </button>
+        </GhostButton>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
+import { QuietDangerButton, buttonClass } from "@/components/Form";
 import { closePost } from "@/lib/actions/posts";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -39,10 +40,7 @@ export default async function CompanyHome({
         You only see posts from your firm. Members see these on the global feed.
       </PageHeader>
       <Notice message={sp.denied} />
-      <Link
-        href="/company/posts/new"
-        className="inline-block rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
-      >
+      <Link href="/company/posts/new" className={buttonClass("primary")}>
         New post
       </Link>
       <ul className="mt-8">
@@ -55,9 +53,9 @@ export default async function CompanyHome({
               </span>
             </Link>
             {p.status === "open" && (
-              <form action={closePost} className="mt-1">
+              <form action={closePost} className="mt-2">
                 <input type="hidden" name="id" value={p.id} />
-                <button className="text-xs uppercase tracking-wider text-white/60">Close</button>
+                <QuietDangerButton type="submit">Close posting</QuietDangerButton>
               </form>
             )}
           </li>

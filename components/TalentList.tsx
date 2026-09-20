@@ -1,5 +1,6 @@
 import { startConversation } from "@/lib/actions/messages";
 import LockedAction from "@/components/LockedAction";
+import { QuietButton, buttonClass } from "@/components/Form";
 import type { CapabilityKey, TierWithCaps } from "@/lib/tiers";
 import { can } from "@/lib/tiers";
 
@@ -62,10 +63,10 @@ export default function TalentList({
               {m.interests && (
                 <p className="mt-1 text-xs text-white/45">Interests: {m.interests}</p>
               )}
-              <div className="mt-3 flex flex-wrap items-center gap-4">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <a
                   href={`/company/talent/${m.id}/resume`}
-                  className="text-xs uppercase tracking-wider text-blue-light"
+                  className={buttonClass("quiet")}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -79,9 +80,7 @@ export default function TalentList({
                     <input type="hidden" name="company_id" value={companyId} />
                     <input type="hidden" name="member_id" value={m.id} />
                     <input type="hidden" name="return_to" value={returnTo} />
-                    <button className="text-xs uppercase tracking-wider text-white/50 hover:text-white">
-                      Message
-                    </button>
+                    <QuietButton type="submit">Message</QuietButton>
                   </form>
                 ) : (
                   <LockedAction
@@ -106,7 +105,7 @@ function ExtLink({ href, label }: { href: string | null; label: string }) {
   return (
     <a
       href={href}
-      className="text-xs uppercase tracking-wider text-white/50 hover:text-white"
+      className={buttonClass("quiet")}
       target="_blank"
       rel="noopener noreferrer"
     >

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Application } from "@/lib/types";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { buttonClass } from "@/components/Form";
 
 export default async function ApplicantsPage({
   searchParams,
@@ -62,10 +63,7 @@ export default async function ApplicantsPage({
             </p>
           )}
         <p className="mb-6">
-          <a
-            href="/company/applicants/export"
-            className="text-xs uppercase tracking-wider text-blue-light"
-          >
+          <a href="/company/applicants/export" className={buttonClass("ghost")}>
             Download CSV
           </a>
         </p>
@@ -76,13 +74,15 @@ export default async function ApplicantsPage({
               <p className="text-sm text-white/60">
                 {a.posts?.title} · {a.stage}
               </p>
-              <ResumeDocLink applicationId={a.id} path={a.resume_path} doc="resume" />
-              <ResumeDocLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
-              {a.post_id && (
-                <Link href={`/company/posts/${a.post_id}`} className="text-xs text-blue-light">
-                  Open posting
-                </Link>
-              )}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <ResumeDocLink applicationId={a.id} path={a.resume_path} doc="resume" />
+                <ResumeDocLink applicationId={a.id} path={a.cover_letter_path} doc="cover" />
+                {a.post_id && (
+                  <Link href={`/company/posts/${a.post_id}`} className={buttonClass("quiet")}>
+                    Open posting
+                  </Link>
+                )}
+              </div>
             </li>
           ))}
         </ul>

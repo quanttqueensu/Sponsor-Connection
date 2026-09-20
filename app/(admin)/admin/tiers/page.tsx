@@ -203,9 +203,10 @@ export default async function AdminTiersPage({
                   <input type="hidden" name="tier_id" value={tier.id} />
                   {tier.is_active ? (
                     <ConfirmSubmitButton
+                      variant="danger"
                       confirmMessage={`Deactivate ${tier.name}? Firms already on it keep it until you move them. It will no longer appear in new assignments.`}
                     >
-                      Deactivate
+                      Deactivate package
                     </ConfirmSubmitButton>
                   ) : (
                     <GhostButton type="submit">Reactivate</GhostButton>
