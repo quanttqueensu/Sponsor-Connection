@@ -2,7 +2,7 @@ import Notice from "@/components/Notice";
 import { markRead, sendMessage } from "@/lib/actions/messages";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Conversation, Message } from "@/lib/types";
+import { one, type Conversation, type Message } from "@/lib/types";
 import { PrimaryButton, TextArea } from "@/components/Form";
 import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
@@ -53,7 +53,7 @@ export default async function ThreadPage({
   const messages = ((rows as Message[] | null) ?? []).slice().reverse();
   const total = count ?? messages.length;
   const olderCount = total - messages.length;
-  const companyName = c.companies?.name ?? "Company";
+  const companyName = one(c.companies)?.name ?? "Company";
 
   // Precompute date separators so nothing is mutated during render.
   const items = messages.map((m, i) => ({

@@ -9,7 +9,6 @@ import {
   updateProfile,
   uploadPhoto,
 } from "@/lib/actions/profile";
-import { signedPhotoUrl } from "@/lib/photos";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { HiringPackage, ProfileSection } from "@/lib/types";
@@ -37,7 +36,10 @@ export default async function ProfilePage({
     .eq("is_default", true)
     .maybeSingle<Pick<HiringPackage, "id" | "name">>();
 
-  const photoUrl = await signedPhotoUrl(profile.photo_path);
+  const photoUrl = profile.photo_path ? `/members/${profile.id}/photo` : null;
+  const sectionRows = (sections as ProfileSection[] | null) ?? [];
+  const nextSort =
+    sectionRows.reduce((max, s) => Math.max(max, s.sort_order), -1) + 1;
 
   return (
     <>
@@ -67,7 +69,13 @@ export default async function ProfilePage({
           <TextInput name="program" defaultValue={profile.program ?? ""} maxLength={120} />
         </Field>
         <Field label="Grad year">
-          <TextInput name="grad_year" type="number" defaultValue={profile.grad_year ?? ""} />
+          <TextInput
+            name="grad_year"
+            type="number"
+            min={1900}
+            max={2100}
+            defaultValue={profile.grad_year ?? ""}
+          />
         </Field>
         <Field label="Bio">
           <TextArea name="bio" rows={4} defaultValue={profile.bio ?? ""} maxLength={2000} />
@@ -89,7 +97,7 @@ export default async function ProfilePage({
 
       <h2 className="mt-14 font-heading text-lg font-bold text-white">Custom sections</h2>
       <ul className="mt-4 space-y-4">
-        {(sections as ProfileSection[] | null)?.map((s) => (
+        {sectionRows.map((s) => (
           <li key={s.id} className="border-t border-white/10 pt-4">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -107,6 +115,7 @@ export default async function ProfilePage({
         ))}
       </ul>
       <form action={addSection} className="mt-6 max-w-xl space-y-3">
+        <input type="hidden" name="sort_order" value={nextSort} />
         <Field label="Section title">
           <TextInput name="label" required placeholder="Coursework" maxLength={80} />
         </Field>

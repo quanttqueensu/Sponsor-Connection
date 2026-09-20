@@ -16,11 +16,14 @@ export default async function PackagesPage({
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
   const supabase = await createClient();
-  const { data: packages } = await supabase
+  const { data: packages, error: packagesError } = await supabase
     .from("hiring_packages")
     .select("*")
     .eq("member_id", profile.id)
     .order("created_at", { ascending: false });
+  if (packagesError) {
+    console.error("packages: query failed", packagesError.message);
+  }
 
   const rows = (packages as HiringPackage[] | null) ?? [];
 
@@ -31,12 +34,16 @@ export default async function PackagesPage({
         package and cover letter on each in-app job.
       </PageHeader>
       <Notice message={sp.denied} />
-      {rows.length === 0 && (
+      {packagesError ? (
+        <p className="border border-white/10 p-6 text-sm text-white/60">
+          Hiring packages could not be loaded. Try again.
+        </p>
+      ) : rows.length === 0 ? (
         <p className="border border-white/10 p-6 text-sm text-white/60">
           You have no hiring packages yet. Build your first one with the form below — you
           need at least one before you can apply to an in-app job.
         </p>
-      )}
+      ) : null}
       <ul className="space-y-4">
         {rows.map((pkg) => (
           <li key={pkg.id} className="border-t border-white/10 py-4">

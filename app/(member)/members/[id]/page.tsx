@@ -1,5 +1,4 @@
 import { getCurrentProfile } from "@/lib/auth";
-import { signedPhotoUrl } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileSection } from "@/lib/types";
 import { notFound, redirect } from "next/navigation";
@@ -17,12 +16,26 @@ export default async function MemberProfilePage({
   const supabase = await createClient();
   const { data: member } = await supabase
     .from("profiles")
-    .select("*")
+    .select(
+      "id, full_name, program, grad_year, bio, interests, linkedin_url, github_url, website_url, photo_path",
+    )
     .eq("id", id)
     .eq("role", "member")
     .maybeSingle();
   if (!member) notFound();
-  const m = member as Profile;
+  const m = member as Pick<
+    Profile,
+    | "id"
+    | "full_name"
+    | "program"
+    | "grad_year"
+    | "bio"
+    | "interests"
+    | "linkedin_url"
+    | "github_url"
+    | "website_url"
+    | "photo_path"
+  >;
   const { data: sections } = await supabase
     .from("profile_sections")
     .select("*")
@@ -37,7 +50,7 @@ export default async function MemberProfilePage({
     { label: "Website", value: m.website_url, kind: "url" as const },
   ].filter((f): f is { label: string; value: string; kind: "text" | "url" } => Boolean(f.value));
 
-  const photoUrl = await signedPhotoUrl(m.photo_path);
+  const photoUrl = m.photo_path ? `/members/${m.id}/photo` : null;
 
   return (
     <article>

@@ -42,20 +42,27 @@ export default async function PostDetailPage({
   }
   if (!post) notFound();
 
-  const { data: comments } = await supabase
+  const { data: comments, error: commentsError } = await supabase
     .from("post_comments")
     .select("*, profiles(id, full_name, photo_path)")
     .eq("post_id", id)
     .order("created_at");
+  if (commentsError) {
+    console.error("feed/[id]: comments query failed", commentsError.message);
+  }
 
-  const { data: packages } =
+  const packagesQuery =
     profile?.role === "member"
       ? await supabase
           .from("hiring_packages")
           .select("*")
           .eq("member_id", profile.id)
           .order("is_default", { ascending: false })
-      : { data: [] as HiringPackage[] };
+      : { data: [] as HiringPackage[], error: null };
+  const packages = packagesQuery.data;
+  if (packagesQuery.error) {
+    console.error("feed/[id]: packages query failed", packagesQuery.error.message);
+  }
 
   const { data: existingApp } = profile
     ? await supabase
@@ -67,6 +74,14 @@ export default async function PostDetailPage({
     : { data: null };
 
   const p = post as Post;
+  const company = one(p.companies);
+  const listingUrl =
+    typeof p.external_url === "string" && /^https?:\/\//i.test(p.external_url)
+      ? p.external_url
+      : null;
+  const canLogOffPlatform =
+    Boolean(profile && profile.role === "member" && listingUrl) &&
+    (p.kind === "job" || p.kind === "job_link");
   const inApp = isInAppJob(p);
   const closed = p.status === "closed";
   const defaultPkg = (packages ?? []).find((x) => x.is_default) ?? packages?.[0];
@@ -93,7 +108,7 @@ export default async function PostDetailPage({
       <h1 className="mt-2 font-heading text-3xl font-bold text-white">{p.title}</h1>
       <p className="mt-2 text-sm text-white/55">
         {[
-          p.companies?.name,
+          company?.name,
           roleTypeLabel(p.role_type),
           termLabel(p.term_season, p.term_year),
           p.location,
@@ -120,14 +135,15 @@ export default async function PostDetailPage({
         {p.company_id && (
           <form action={startConversation}>
             <input type="hidden" name="company_id" value={p.company_id} />
+            <input type="hidden" name="return_to" value={`/feed/${p.id}`} />
             <button className="rounded border border-white/15 px-4 py-2 text-xs uppercase tracking-wider text-white/70">
               Message
             </button>
           </form>
         )}
-        {p.external_url && (
+        {listingUrl && (
           <a
-            href={p.external_url}
+            href={listingUrl}
             target="_blank"
             rel="noreferrer"
             className="rounded bg-primary px-5 py-2.5 text-xs uppercase tracking-wider text-white"
@@ -137,11 +153,11 @@ export default async function PostDetailPage({
         )}
       </div>
 
-      {p.external_url && profile && !existingApp && (
+      {canLogOffPlatform && !existingApp && (
         <form action={logOffPlatform} className="mt-6 max-w-md space-y-3">
           <input type="hidden" name="post_id" value={p.id} />
           <input type="hidden" name="company_id" value={p.company_id ?? ""} />
-          <input type="hidden" name="company_name" value={p.companies?.name ?? "External"} />
+          <input type="hidden" name="company_name" value={company?.name ?? "External"} />
           <p className="text-xs text-white/60">
             {closed
               ? "Applied on their site before this closed? You can still log it for execs."
@@ -151,13 +167,13 @@ export default async function PostDetailPage({
         </form>
       )}
 
-      {p.external_url && profile && existingApp && (
+      {canLogOffPlatform && existingApp && (
         <p className="mt-6 text-sm text-blue-light">
           Logged — this is in your applications.
         </p>
       )}
 
-      {isPlatformJob(p) && profile && !inApp && (
+      {isPlatformJob(p) && profile?.role === "member" && !inApp && (
         <section className="mt-10 max-w-lg border-t border-white/10 pt-8">
           <h2 className="font-heading text-lg font-bold text-white">Apply</h2>
           <p className="mt-3 text-sm text-white/60">
@@ -170,7 +186,7 @@ export default async function PostDetailPage({
         </section>
       )}
 
-      {inApp && profile && (
+      {inApp && profile?.role === "member" && (
         <section className="mt-10 max-w-lg border-t border-white/10 pt-8">
           <h2 className="font-heading text-lg font-bold text-white">Apply</h2>
           {existingApp ? (
@@ -178,6 +194,10 @@ export default async function PostDetailPage({
           ) : !firmAcceptsHubApps ? (
             <p className="mt-3 text-sm text-white/60">
               This listing is not taking applications in the hub.
+            </p>
+          ) : packagesQuery.error ? (
+            <p className="mt-3 text-sm text-white/60">
+              Hiring packages could not be loaded. Try again.
             </p>
           ) : !packages?.length ? (
             <div className="mt-3">
@@ -232,9 +252,16 @@ export default async function PostDetailPage({
       <section className="mt-12 border-t border-white/10 pt-8">
         <h2 className="font-heading text-lg font-bold text-white">Comments</h2>
         <ul className="mt-4 space-y-4">
+          {commentsError ? (
+            <li className="text-sm text-white/60">Comments could not be loaded. Try again.</li>
+          ) : (comments as PostComment[] | null)?.length === 0 ? (
+            <li className="text-sm text-white/60">No comments yet.</li>
+          ) : null}
           {(comments as PostComment[] | null)?.map((c) => (
             <li key={c.id} className="text-sm">
-              <span className="text-white/80">{c.profiles?.full_name ?? "Member"}</span>
+              <span className="text-white/80">
+                {one(c.profiles)?.full_name ?? "Member"}
+              </span>
               <p className="mt-1 text-white/60">{c.body}</p>
             </li>
           ))}

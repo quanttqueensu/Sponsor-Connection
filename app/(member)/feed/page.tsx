@@ -40,7 +40,8 @@ export default async function FeedPage({
 
   const sponsorOnly = sp.sponsor === "1";
   const parsedPage = Number(sp.page);
-  const page = Number.isFinite(parsedPage) && parsedPage > 1 ? Math.floor(parsedPage) : 1;
+  const page =
+    Number.isInteger(parsedPage) && parsedPage >= 1 && parsedPage <= 10000 ? parsedPage : 1;
   const from = (page - 1) * PAGE_SIZE;
 
   // Sponsor status lives on the joined company's tier, so push the filter into
@@ -63,7 +64,10 @@ export default async function FeedPage({
   if (sponsorOnly) query = query.gt("companies.sponsor_tiers!sponsor_tier_id.rank", 0);
   if (sp.kind) query = query.eq("kind", sp.kind);
   if (sp.role_type) query = query.eq("role_type", sp.role_type);
-  if (sp.location) query = query.ilike("location", `%${sp.location}%`);
+  if (sp.location) {
+    const location = String(sp.location).replace(/[,()*%\\]/g, " ").trim();
+    if (location) query = query.ilike("location", `%${location}%`);
+  }
   if (sp.company) query = query.eq("company_id", sp.company);
   if (sp.term) {
     const [season, year] = sp.term.split("-");
